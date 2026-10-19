@@ -3,16 +3,24 @@
 Protocol-version seed for the SEAMS wire - the attribution and value-routing
 protocol for creative work shared across AI-augmented collaborators.
 
-**What this is, and why it exists.** Creative work made with AI assistance
-currently erases attribution: the model's output leaves no record of which
-human work it came from, and there is no path for value to flow back to
-that human. SEAMS is the protocol for fixing that - a signed,
-consent-first, fail-closed wire on which a work carries who made it, what
-use is permitted, and where value routes. It is also the referee: a
-deterministic battle-test kit that checks any implementation against the
-protocol's counted vectors. This repo is a seed, not a product - the
-protocol contract, its invariants, the vector suite that pins behavior,
-and a zero-infrastructure reference target you can run on any machine with
+**What this is, and why it exists.** Two problems, one wire. First, the
+attribution hole: AI-assisted creative work currently erases attribution -
+the model's output leaves no record of which human work it came from, and
+there is no path for value to flow back to that human. Second, the
+structural hole: whatever fixes the first must not recreate what it
+rejects - a fix owned by a gatekeeper, swayed by a hierarchy, or opinionated
+in the protocol itself can't empower all people, and the only way to build
+it properly is with everybody helping. SEAMS is the protocol for both at
+once - a signed, consent-first, fail-closed wire on which a work carries
+who made it, what use is permitted, and where value routes. The protocol
+layer is opinionless by design: it moves signed messages about consent,
+attribution, and compensation ratios, and the morals and decisions stay
+with the entities on the ends of the wire - the vertical owns the stack,
+the horizontal owns the protocol. It is also the referee: a deterministic
+battle-test kit that checks any implementation against the protocol's
+counted vectors. This repo is a seed, not a product - the protocol
+contract, its invariants, the vector suite that pins behavior, and a
+zero-infrastructure reference target you can run on any machine with
 Python 3.
 
 This repo is the publishable form of the SEAMS wire spec (edition
