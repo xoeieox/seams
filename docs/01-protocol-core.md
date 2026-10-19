@@ -1,6 +1,6 @@
 # 01 — Protocol Core
 
-Packet: SEAMS / 2026-10-12 / keeper. The protocol proper — doctrine invariants, the Route-Manifest spec chain, the mesh-protocol invariant seam, the conformance contract, the code+tests surface. This is what Claude builds to. Path adjudication (dispatch names RAIKI.md / PROTOCOL.md / specs/ / whitepaper/ — all ABSENT from the zephyr repo; the real core is below) lives in `04-open-gaps.md` §6.1. The attribution→payment seam docs are in `02`; lock gaps in `04`.
+Packet: SEAMS / 2026-10-12 / keeper. The protocol proper — doctrine invariants, the Route-Manifest spec chain, the mesh-protocol invariant seam, the conformance contract, the code+tests surface. This is what Claude builds to. Path adjudication (dispatch names RAIKI.md / PROTOCOL.md / specs/ / whitepaper/ — all ABSENT from the zephyr repo; the real core is below) lives in `04-open-gaps.md` §6.1 [excluded from public seed]. The attribution→payment seam docs are in `02`; lock gaps in `04` [excluded from public seed].
 
 ---
 
@@ -52,7 +52,7 @@ Apache License 2.0 - see `LICENSE` and `NOTICE`.
 
 ---
 
-## 3. The spec chain — `/room/planning/specs/` (VERBATIM, four essentials)
+## 3. The spec chain — [internal-path-removed] (VERBATIM, four essentials)
 
 Real spec home (dispatch's `specs/12 docs` in-repo: ABSENT; the directory holds 23 zephyr-series files, e.g. `zephyr-agent-identity-anchor-v0.md`, `zephyr-signed-attribution-foundation-v0.md`, `zephyr-build-signed-envelope-v0.md`, `zephyr-aggregation-v0.md`, `zephyr-byte-serving-v0.md`, `zephyr-refund-v0.md`, `zephyr-vouch-v0.md`, `zephyr-human-node-vouch-v0.md`, the `zephyr-t4-*` series, `zephyr-stop-minting-settlement-intents-v0.md`, the `zephyr-use-terms-*` series, and the four embedded below). The audit's candidate manifest names exactly these four as the protocol-side essentials.
 
@@ -492,7 +492,7 @@ identities only (`agent:route-test`, `agent:claims-test`); no writes outside tmp
   provenance-dict key there; read it via the recorded provenance dict (`provenance_json` or the
   `derived_from` column, either is acceptable; do not write it).
 - `archetypes_core` resolves via a host-global editable install
-  (`/home/jellyfish/.local/lib/python3.12/site-packages/__editable__.archetypes_core-0.1.0.pth`
+  (`[internal-path-removed]`
   -> `/data/git/archetypes-core`); no pyproject change needed and none permitted.
 - `to_lapis_return` accepts `timestamp=` - thread the compiler's injectable timestamp through
   `record_signed(**prov_kwargs)` for AC7 determinism; without injection it defaults to now and
@@ -1092,7 +1092,7 @@ Test files: extend `tests/test_claims.py` and `tests/test_routing.py`, AC-number
 - `python3 -m pytest tests/`, never bare `pytest` (see DoD 1). This is the single most common false-green on
   this repo.
 - `archetypes_core` resolves via a host-global editable install
-  (`/home/jellyfish/.local/lib/python3.12/site-packages/__editable__.archetypes_core-0.1.0.pth` ->
+  (`[internal-path-removed]` ->
   `/data/git/archetypes-core`). No pyproject change needed and none permitted. **Known trap from the U0/U1
   dispatch:** if the worktree sets `PYTHONUSERBASE` to a worktree-local `.pyuserbase`, that `.pth` is NOT
   auto-processed - copy `__editable__.archetypes_core-0.1.0.pth` and

@@ -1,6 +1,6 @@
 # 02 — Attribution ↔ Payment (Zephyr rail + consent)
 
-Packet: SEAMS / 2026-10-12 / keeper. This is the attribution-to-payment-rail seam: the ratified rail design, its ratification ledger, the live-testnet money-plane proof, the mesh protocol + signing side of the packet, and the consent doctrine as it stands. Source paths verbatim-tagged; `…` abbreviates `/data/git/inertia-vault-working`. Stale-name adjudication lives in `04-open-gaps.md` §6 — do not read absence there as absence of content.
+Packet: SEAMS / 2026-10-12 / keeper. This is the attribution-to-payment-rail seam: the ratified rail design, its ratification ledger, the live-testnet money-plane proof, the mesh protocol + signing side of the packet, and the consent doctrine as it stands. Source paths verbatim-tagged; `…` abbreviates `/data/git/inertia-vault-working`. Stale-name adjudication lives in `04-open-gaps.md` §6 [excluded from public seed] — do not read absence there as absence of content.
 
 ---
 
@@ -297,7 +297,7 @@ The attribution->payment rail design, arc-derived by Fable PM session 2026-07-20
 
 ```text
 decision/zephyr-op-rail-u2b-python-seams-split-2026-07-22
-RATIFIED by Erah 2026-07-22 (jellyfish/BRIX PM session). Zephyr->Open-Payments rail, U2 RE-SPLIT + U2b bound.
+RATIFIED by Erah 2026-07-22 (PM session). Zephyr->Open-Payments rail, U2 RE-SPLIT + U2b bound.
 
 CONTEXT: U0+U1 (zephyr PR #12, RouteManifest compiler) + U2a hardening (PR #13) both LANDED+verified 2026-07-21. Arc originally named U2 'the executor' (one Node unit). Pre-bind investigation 2026-07-22 found U2 is NOT one unit: the verified U2a surface gives the executor everything to READ a manifest (get_manifest_for_event/is_current_head/reverify_leg/resolve_wallet, all fail-closed) but exposes TWO Python-shaped seams that don't exist: (1) no per-leg receipt deposit-back API (manifest surface is read-only; the only write-backs - write_settlement_info/settler/ledger.py/intent_queue.py - are the OLD flat per-deposit demo path, wrong shape for legs); (2) no sanctioned Node read/write seam (contract is Python-only; python -m zephyr.route only compiles). Same lesson as the U2a/U2b split ('spec the executor against a verified foundation, not one it repairs mid-flight') applied recursively.
 
@@ -309,7 +309,7 @@ DECISION 3 - ORPHAN POSTURE (domain-before-sign): route_receipt DUAL-WRITES like
 
 GATE: GW-voiced spec-review ran 3 rounds 2026-07-22 (GW clear after Astrea-9B quant finished) -> proceed-to-bind. R1 amend (Facets split/investigate; atomicity + undefined exceptions). R2 amend (Facets consensus/high; flip to domain-before-sign). R3 proceed-to-bind: Facets consensus/proceed/high, Mirror Council RESOLVED FULLY CONVERGED (all 3 voices agree, zero stand-asides, zero blocks - 'Lock->Verify->Hash->Insert->Commit->Sign'). A 4-reviewer Sonnet PRE-GATE pass (off-GW) first caught blockers (missing seq column on deposits, exact-match reader, payer_retained conservation bug). GW reference leg skipped all 3 rounds (slot2_collapsed_to_primary, known topology).
 
-BIND: lapis-pm bind zephyr-route-executor-foundation-v0 --spec-from /room/planning/specs/zephyr-route-executor-foundation-v0.md --repo zephyr --create --title '...' --authority hold --verification pm-live-test (NOTE: --title required with --create). Force-dispatched fixer task claude_20260722_151804_3760_fixerzephyrrouteexecutor, dispatched:1 verified. Authority HOLD deliberate = PR routes to /pm-pr-review, NOT auto-land (U1 advisory auto-land is how 3 gaps shipped). pm-live-test needs MANUAL unbind after confirm.
+BIND: lapis-pm bind zephyr-route-executor-foundation-v0 --spec-from [internal-spec-path-removed] --repo zephyr --create --title '...' --authority hold --verification pm-live-test (NOTE: --title required with --create). Force-dispatched fixer task claude_20260722_151804_3760_fixerzephyrrouteexecutor, dispatched:1 verified. Authority HOLD deliberate = PR routes to /pm-pr-review, NOT auto-land (U1 advisory auto-land is how 3 gaps shipped). pm-live-test needs MANUAL unbind after confirm.
 
 NEXT: /pm-pr-review the fixer PR when it lands, then spec U2c (Node executor; quote each leg debitAmount=leg amount to dissolve grant/quote ordering paradox; spike ~/zephyr-live-capture/live_capture.mjs; testnet wallets ~/.zephyr-secrets/). Supersedes nothing; builds on decision/zephyr-op-rail-route-manifest-design-2026-07-20.
 ```
@@ -349,7 +349,7 @@ HONEST CEILING: Zephyr does not make splits objectively fair; it makes the squis
 
 ```text
 decision/zephyr-collective-payout-lead-wallet-ask-2026-06-28
-POSSIBILITY-SPACE RESOLUTION 2026-06-28 (Erah+jellyfish BRIX session) of the OP-accelerator 'lead-wallet' open question (FIRM-UP flag in project/op-accelerator-application-2026-06-24): how Zephyr takes a single point-of-sale and distributes to the attribution chain/collective over Open Payments WITHOUT a custodial lead wallet.
+POSSIBILITY-SPACE RESOLUTION 2026-06-28 (Erah + PM seat session) of the OP-accelerator 'lead-wallet' open question (FIRM-UP flag in project/op-accelerator-application-2026-06-24): how Zephyr takes a single point-of-sale and distributes to the attribution chain/collective over Open Payments WITHOUT a custodial lead wallet.
 
 DECISIVE FINDING: Open Payments ALREADY does non-custodial splitting today (guide https://openpayments.dev/guides/split-payments/) - SENDER-SIDE: buyer's wallet creates multiple outgoing payments, one per recipient; 'funds meant for one party never pass through the other'; one interactive grant w/ total budget authorizes the fan-out. So 'please build non-custodial splitting' is a TRAP ask (they shipped it) - don't walk in with it.
 
@@ -376,11 +376,11 @@ WHY GREAT ASK: specific+technical; keeps LIABILITY off the rail (if OP computed 
 
 ```text
 decision/zephyr-live-openpayments-settlement-2026-06-14
-DECISION + MILESTONE 2026-06-14 (jellyfish/BRIX): Real signed Open Payments settlement for the Zephyr Interledger Fellowship demo is built on the OFFICIAL @interledger/open-payments Node SDK (v7.4.0), NOT by fixing the repo Python settler/op_flow.py+gnap.py (which made unsigned httpx calls and had a broken GNAP interactive continuation - posts to wrong URL, omits interact_ref). RATIONALE: the SDK does GNAP + HTTP Message Signatures (RFC 9421) correctly; hand-rolling signing is error-prone; ILF deadline ~June 15. The live capture is an OPERATOR-RUN SPIKE (needs Erah to approve the outgoing-payment grant once in the wallet UI + uses real testnet keys), deliberately NOT a dispatched/CI unit, per the live-capture spec ("live path is operator-run").
+DECISION + MILESTONE 2026-06-14 (PM seat): Real signed Open Payments settlement for the Zephyr Interledger Fellowship demo is built on the OFFICIAL @interledger/open-payments Node SDK (v7.4.0), NOT by fixing the repo Python settler/op_flow.py+gnap.py (which made unsigned httpx calls and had a broken GNAP interactive continuation - posts to wrong URL, omits interact_ref). RATIONALE: the SDK does GNAP + HTTP Message Signatures (RFC 9421) correctly; hand-rolling signing is error-prone; ILF deadline ~June 15. The live capture is an OPERATOR-RUN SPIKE (needs Erah to approve the outgoing-payment grant once in the wallet UI + uses real testnet keys), deliberately NOT a dispatched/CI unit, per the live-capture spec ("live path is operator-run").
 
 MILESTONE: real CROSS-CURRENCY settlement COMPLETED on interledger-test.dev 2026-06-14 - C(PEB) pays 0.02, B(CAD) receives 0.01 (real ILP FX in the quote), outgoing payment id .../outgoing-payments/2725b490-4ebd-4ef2-8d71-bc584c03b6de, state COMPLETED, failed=false. The Python op_flow/gnap path being unsigned was the long-standing blocker; this validates the whole flow end to end.
 
-CODE: /home/jellyfish/zephyr-live-capture/live_capture.mjs (two-phase, polling continuation). REPO-PACKAGED COPY: /home/jellyfish/zephyr-interledger-demo/capture/live_capture.mjs (Codeberg-bound, see project/zephyr-demo-visualization-2026-06-12).
+CODE: [internal-path-removed]/live_capture.mjs (two-phase, polling continuation). REPO-PACKAGED COPY: [internal-path-removed]/capture/live_capture.mjs (Codeberg-bound, see project/zephyr-demo-visualization-2026-06-12).
 
 DEFERRED: fold this signed flow into the zephyr repo via the normal worker/PR loop (replaces the broken Python GNAP path). Related: infra/zephyr-testnet-wallets-connection-2026-06-12.
 ```
@@ -401,7 +401,7 @@ DEFERRED: fold this signed flow into the zephyr repo via the normal worker/PR lo
 
 ```text
 decision/zephyr-stops-minting-payment-claims-2026-08-11
-RATIFIED by Erah 2026-08-11 (jellyfish/BRIX interactive PM, Opus 5 1M), via voice transcript after a
+RATIFIED by Erah 2026-08-11 (interactive PM, Opus 5 1M), via voice transcript after a
 five-lens sweep. Erah, unprompted, on being shown the settlement-intent queue: "I don't think Zephyr
 should have a minting of payments. That's incorrect. I would say that's probably even a violation of
 an invariance somewhere because there's no real money flowing. There shouldn't be money accumulating.
@@ -585,7 +585,7 @@ Full ratified basis for this document:
 
 ```text
 decision/knowledge-mesh-seed-packet-v0-gated-bound-2026-07-20
-GATED + BOUND + DISPATCHED 2026-07-20 (Fable PM session). Target knowledge-mesh-seed-packet-v0, repo lapis/knowledge-mesh-seed (NEW, org lapis - conductor token lacks write:admin so erah/ was not possible; bind uses full org/repo form), authority HOLD, verification machine. Spec /room/planning/specs/knowledge-mesh-seed-packet-v0.md. Repo bootstrapped same session: clone /data/git/knowledge-mesh-seed-working, CLAUDE.md on main (commit 2b8b45b). GATE HISTORY, two passes, GW-voiced Facets + Council both: PASS 1 shape-with-erah - Facets consensus/high (contract-first, read-only runner, unsanitized gap report, human-surfaced reconciliation - all folded); Council converged-with-reservation, landing = DUAL-LAYER requirements (Essential binary vs Living impact-declared Blocker/Deferred w/ cost_of_delay), 3 stand-asides on Deferred-rot; TWO open questions ERAH-CLEARED: Q1 deferred-rot = trigger + auto-re-escalate (every Deferred carries revisit date-or-event, runner always shows aging, past-trigger flips to Blocker), Q2 claim-truth = structural + signed ledger (Deferred legal ONLY on living layer, declarations signed + deposited to Zephyr, accountability not lie-detection; bootstrap carve-out pending-deposit until identity green). Sonnet 8 issues folded (schema example, harness = bring-your-own axis not a component, fixture defect enumeration, provenance format, runner exit codes 0/1/2, sandbox-visibility fixer note per attestation-spine precedent). PASS 2 amend-spec - Facets split/medium FOLDED (revisit trigger = date OR named event, run-time evaluation only, expired-while-degraded reports as RECOVERABLE class not rot-Blocker); Council LAID-DOWN w/ one BLOCK (Sun-Tzu-voiced: runner must judge never teach) vs 2 stand-asides (Sundiata/Murasaki-voiced: freed-without-tools / no path of repair); THREE open questions ERAH-CLEARED: Q1 judge+pointer (runner output pure judgment but every assertion carries grow_ref anchor into GROW.md, gap report prints ref - addresses, does not teach; honors the block AND the stand-asides), Q2 peer-audit Blocker-lift = defer to post-MVP but NAME it in mesh-protocol.md as future surface, Q3 deferral motive NOT adjudicated (no motive field; cost + aging + ledger legibility make cowardly-vs-strategic humanly legible). Sonnet pass-2 fixable folds: explicit fixture tree, normative machine-parseable schema in conform/, no-new-abstractions out-of-scope line. Two-pass ceiling reached w/ Erah judgment = bind per skill. DISPATCHED fixer claude_20260720_151936_8484, dispatched:1 verified. NEXT = pm-pr-review when PR opens (HOLD routes to Erah); then S1 knowledge-mesh-seed-macbook-garden-v0 (dirty garden bed incl. vault git-canonical per fork C) + feeders zephyr-git-ingest-v0, lapis-pm 1b. Relates decision/knowledge-mesh-seed-packet-v0-forks-dirty-node-test-2026-07-20.
+GATED + BOUND + DISPATCHED 2026-07-20 (Fable PM session). Target knowledge-mesh-seed-packet-v0, repo lapis/knowledge-mesh-seed (NEW, org lapis - conductor token lacks write:admin so erah/ was not possible; bind uses full org/repo form), authority HOLD, verification machine. Spec [internal-spec-path-removed]. Repo bootstrapped same session: clone /data/git/knowledge-mesh-seed-working, CLAUDE.md on main (commit 2b8b45b). GATE HISTORY, two passes, GW-voiced Facets + Council both: PASS 1 shape-with-erah - Facets consensus/high (contract-first, read-only runner, unsanitized gap report, human-surfaced reconciliation - all folded); Council converged-with-reservation, landing = DUAL-LAYER requirements (Essential binary vs Living impact-declared Blocker/Deferred w/ cost_of_delay), 3 stand-asides on Deferred-rot; TWO open questions ERAH-CLEARED: Q1 deferred-rot = trigger + auto-re-escalate (every Deferred carries revisit date-or-event, runner always shows aging, past-trigger flips to Blocker), Q2 claim-truth = structural + signed ledger (Deferred legal ONLY on living layer, declarations signed + deposited to Zephyr, accountability not lie-detection; bootstrap carve-out pending-deposit until identity green). Sonnet 8 issues folded (schema example, harness = bring-your-own axis not a component, fixture defect enumeration, provenance format, runner exit codes 0/1/2, sandbox-visibility fixer note per attestation-spine precedent). PASS 2 amend-spec - Facets split/medium FOLDED (revisit trigger = date OR named event, run-time evaluation only, expired-while-degraded reports as RECOVERABLE class not rot-Blocker); Council LAID-DOWN w/ one BLOCK (Sun-Tzu-voiced: runner must judge never teach) vs 2 stand-asides (Sundiata/Murasaki-voiced: freed-without-tools / no path of repair); THREE open questions ERAH-CLEARED: Q1 judge+pointer (runner output pure judgment but every assertion carries grow_ref anchor into GROW.md, gap report prints ref - addresses, does not teach; honors the block AND the stand-asides), Q2 peer-audit Blocker-lift = defer to post-MVP but NAME it in mesh-protocol.md as future surface, Q3 deferral motive NOT adjudicated (no motive field; cost + aging + ledger legibility make cowardly-vs-strategic humanly legible). Sonnet pass-2 fixable folds: explicit fixture tree, normative machine-parseable schema in conform/, no-new-abstractions out-of-scope line. Two-pass ceiling reached w/ Erah judgment = bind per skill. DISPATCHED fixer claude_20260720_151936_8484, dispatched:1 verified. NEXT = pm-pr-review when PR opens (HOLD routes to Erah); then S1 knowledge-mesh-seed-macbook-garden-v0 (dirty garden bed incl. vault git-canonical per fork C) + feeders zephyr-git-ingest-v0, lapis-pm 1b. Relates decision/knowledge-mesh-seed-packet-v0-forks-dirty-node-test-2026-07-20.
 ```
 
 `decision/knowledge-mesh-seed-packet-v0-layout-and-runner-2026-07-20`:
@@ -610,7 +610,7 @@ NODE TOPOLOGY CONTEXT: lapis-machinery node (BRIX + GravityWell + StarHouse toge
 
 ```text
 decision/knowledge-mesh-seed-packet-s0b-landed-s1-scoping-2026-07-22
-STATE + DECISION 2026-07-22 (jellyfish PM session, live git verified). 
+STATE + DECISION 2026-07-22 (PM session, live git verified). 
 
 STATE: lapis/knowledge-mesh-seed main now carries BOTH S0 and S0b. S0 (packet assembly, PR #1, commit be429f7) landed 2026-07-20: contract (components/*/requirements.yaml) + reference shapes (seeds/*) + GROW.md + conform/km-conform.py + fixtures/dirty-node/. S0b (invariant-governance, PR #2, commit 8d090fa 'feat: add governance component (invariant ledger + operations/council deliberation)') LANDED since the 07-20 note - confirmed by git fetch showing be429f7..8d090fa on origin/main. Target knowledge-mesh-seed-invariant-governance-v0 status = dispatched 2 total, 0 pending, outstanding (none). FLAG (unconfirmed): S0b is hold-authority yet auto-landed; worth confirming it passed a real pm-pr-review before merge (not verified this session). Unit-1 attestation spine already LIVE on BRIX :8412, MacBook ran DoD green (knowledge-mesh-attestation-spine-arc).
 
@@ -800,7 +800,7 @@ exceptionless everywhere else.
 
 ### 4.4 GW-mirror note (dispatch-named key absent; real evidence)
 
-No mem.db key for a seed-packet GW mirror exists. The audit §D records instead: Mac `/Users/erhei/Projects/Lapis/knowledge-mesh-seed` is an exact top-level match to BRIX `/data/git/knowledge-mesh-seed-working` (identical file sizes; README 6267 B, GROW.md 29388 B, friction.json 4647 B, CLAUDE.md 2139 B), content-current to the 2026-07-23 packet, divergence unverified below top level. Sovereignty stance (audit §C): self-hosted, local-first, NEVER GitHub — remotes are Forgejo (`git@forgejo:lapis/knowledge-mesh-seed.git`).
+No mem.db key for a seed-packet GW mirror exists. The audit §D records instead: Mac mirror path [internal-path-removed] is an exact top-level match to BRIX `/data/git/knowledge-mesh-seed-working` (identical file sizes; README 6267 B, GROW.md 29388 B, friction.json 4647 B, CLAUDE.md 2139 B), content-current to the 2026-07-23 packet, divergence unverified below top level. Sovereignty stance (audit §C): self-hosted, local-first, NEVER GitHub — remotes are Forgejo (`git@forgejo:lapis/knowledge-mesh-seed.git`).
 
 ---
 
@@ -828,7 +828,7 @@ tags:
 **Owner:** Erah · **Maintained by:** Lab
 **Updated:** 2026-09-26 ~13:00 PDT
 **What this is:** the single planning surface for the consent/attribution work - where we are, what's next, what's blocked on whom. Lab updates it as things move; Erah reads it to steer.
-**Canonical location:** this file - Inertia Vault `Lapis/Strategy-Consent-Attribution.md` on BRIX, syncthing to MacBook `~/Projects/inertia-vault` (read in Obsidian; Mac side is receiveonly, so read there, edit via Lab). Working docs: Room `research/consent-attribution/` (BRIX `/room/research/consent-attribution/`, syncthing to `~/Room/research/consent-attribution/`). GravityWell `research/` is Lab's staging. Never `/srv/fast/room/` - unsynced ghost tree (2026-09-26 correction).
+**Canonical location:** this file - Inertia Vault `Lapis/Strategy-Consent-Attribution.md` on BRIX, syncthing to MacBook `~/Projects/inertia-vault` (read in Obsidian; Mac side is receiveonly, so read there, edit via Lab). Working docs: Room `research/consent-attribution/` (room store [internal-room-path-removed], mirrored to the Mac receive-only copy). GravityWell `research/` is Lab's staging. Never the ghost-tree copy of the room store - unsynced (2026-09-26 correction).
 
 ---
 
@@ -890,7 +890,7 @@ One line: build the Consent & Attribution Registry (working name) credibility-fi
 
 ## Maintenance protocol
 
-- Lab updates this file (staged at GravityWell `research/living-strategy-doc-staging.md`, pushed to this vault path and kept identical) on every meaningful state change; bumps the Updated stamp.
+- Lab updates this file (staged at the staging lane `research/living-strategy-doc-staging.md`, pushed to this vault path and kept identical) on every meaningful state change; bumps the Updated stamp.
 - Decisions get struck through with the outcome + date once made, not deleted.
 - New pending items enter "On Erah" or "On others" - never only in chat.
 - If this doc and chat disagree, this doc is the claim to fix.
@@ -968,7 +968,7 @@ The Expert/operator boundary is elaborated in [Expert Identity - Operator Body P
 ```text
 project/zephyr-consent-rail-shipped-2026-09-29
 ---
-ZEPHYR CONSENT RAIL - SHIPPED STATE (as of 2026-09-29): consent-to-use (use_terms rail v0) = signed, revocable use declarations on works: USE_VOCAB {training, remix, redistribution}, tri-state permitted/denied/undeclared (undeclared is NEVER permission and never more permissive than a prior denied - consumer-law line in README), tombstone via revokes=True, deposit-authoritative both ways (missing_domain_row/orphan_domain_row), selection max-seq + verdicts off verified ClaimIntegrityResult.payload. SHIP TIMELINE: private erah/zephyr main: consent PR #21 merged 2026-09-28 22:05 PT (f5b7496, advisory hold-tier, machine-clean ratify - decision/dossier/zephyr-use-terms-merge-2026-09-28); hygiene v0 PR #22 (2cacdef, 2026-09-29 07:24 PT: verify-except KeyError, payload revokes read, conditional hat-remix); hygiene v1 PR #23 (eb2c8e99, 09:20 PT: resolve_wallet + reverify_leg payload/verify-first discipline + demo README 4-scene refresh; dossier decision/dossier/zephyr-use-terms-hygiene-v1-merge-2026-09-29). PUBLIC: mirror github.com/xoeieox/zephyr main 537d90f684fffd3c023c8f860afee38917ab555b, fast-forward from bb035e25, 2026-09-29 ~09:50 PT) - Neo code seat synced through rewrite rules, zero-hit anti-overclaim gate, PM reproduced every checkable claim (gate re-run, rail presence, identities, leak sweeps, public suite 600+1); full record decision/zephyr-publication-decision-mirror-sync-2026-09-28 STATUS CLOSED + project/zephyr-mirror-consent-sync-landed-2026-09-29 + /room/planning/DEPOSIT-neo-zephyr-mirror-sync-2026-09-29.md. OSAIF context: the OSAIF email (sent 2026-09-28) used consent as the hinge; landing this unit is the 'work to make them true' per Erah's council-answer. Doctrine anchors: consent is CO-EQUAL axis to ATTRIBUTION upstream of route-not-compute (decision/zephyr-consent-coequal-axis-attribution-2026-07-08); money/use decoupled in v0 (design position). Arc docs /room/lapis-state/zephyr-use-terms-{consent-v0,hygiene-v0,hygiene-v1}.md; specs /room/planning/specs/ same names. Known-deferred (deliberate): event-scoped consultation (scope stored+hashed, consulted by nothing), CLI surface python -m zephyr.use, blanket per-author defaults, note cap (ships with CLI), witness countersignature, GNAP interactive consent. Open triage: project/zephyr-replay-guard-triage-open-2026-09-29.
+ZEPHYR CONSENT RAIL - SHIPPED STATE (as of 2026-09-29): consent-to-use (use_terms rail v0) = signed, revocable use declarations on works: USE_VOCAB {training, remix, redistribution}, tri-state permitted/denied/undeclared (undeclared is NEVER permission and never more permissive than a prior denied - consumer-law line in README), tombstone via revokes=True, deposit-authoritative both ways (missing_domain_row/orphan_domain_row), selection max-seq + verdicts off verified ClaimIntegrityResult.payload. SHIP TIMELINE: private erah/zephyr main: consent PR #21 merged 2026-09-28 22:05 PT (f5b7496, advisory hold-tier, machine-clean ratify - decision/dossier/zephyr-use-terms-merge-2026-09-28); hygiene v0 PR #22 (2cacdef, 2026-09-29 07:24 PT: verify-except KeyError, payload revokes read, conditional hat-remix); hygiene v1 PR #23 (eb2c8e99, 09:20 PT: resolve_wallet + reverify_leg payload/verify-first discipline + demo README 4-scene refresh; dossier decision/dossier/zephyr-use-terms-hygiene-v1-merge-2026-09-29). PUBLIC: mirror github.com/xoeieox/zephyr main 537d90f684fffd3c023c8f860afee38917ab555b, fast-forward from bb035e25, 2026-09-29 ~09:50 PT) - Neo code seat synced through rewrite rules, zero-hit anti-overclaim gate, PM reproduced every checkable claim (gate re-run, rail presence, identities, leak sweeps, public suite 600+1); full record decision/zephyr-publication-decision-mirror-sync-2026-09-28 STATUS CLOSED + project/zephyr-mirror-consent-sync-landed-2026-09-29 + [internal-room-deposit-removed]. OSAIF context: the OSAIF email (sent 2026-09-28) used consent as the hinge; landing this unit is the 'work to make them true' per Erah's council-answer. Doctrine anchors: consent is CO-EQUAL axis to ATTRIBUTION upstream of route-not-compute (decision/zephyr-consent-coequal-axis-attribution-2026-07-08); money/use decoupled in v0 (design position). Arc docs [internal-room-paths-removed]; specs [internal-spec-path-removed] same names. Known-deferred (deliberate): event-scoped consultation (scope stored+hashed, consulted by nothing), CLI surface python -m zephyr.use, blanket per-author defaults, note cap (ships with CLI), witness countersignature, GNAP interactive consent. Open triage: project/zephyr-replay-guard-triage-open-2026-09-29.
 ```
 
 ### 5.4 Consent-compliance integration (research/distillation, VERBATIM; per audit §F item 5 shipped WITHOUT its adult-platform siblings)
@@ -1102,7 +1102,7 @@ tags: [context-management, synapse, weaver, gardener, recall, zephyr, gravitywel
 
 # Context Management & Zephyr — Research + Decision (2026-06-02)
 
-> Method: two-pass adversarially-verified web research (deep-research harness, ~210 agents / 3.2M tokens across both passes) + mining of the in-house corpora (`/room/research/rsi` 91 papers, `agentic-subconscious`, `harness-component-library`) + a live survey of the running BRIX services. mem.db is authoritative; this doc is the narrated record.
+> Method: two-pass adversarially-verified web research (deep-research harness, ~210 agents / 3.2M tokens across both passes) + mining of the in-house corpora ([internal-room-path-removed] 91 papers, `agentic-subconscious`, `harness-component-library`) + a live survey of the running BRIX services. mem.db is authoritative; this doc is the narrated record.
 
 ## Headline
 
@@ -1167,7 +1167,7 @@ Run the rebuild-tail **as** the first multi-node project: ships substrate fixes 
 > The CPU/GPU boundary the substrate research forces **is** the BRIX/GW node split. They were never two decisions.
 
 ## Housekeeping (this session)
-- Repaired the off-node sync gap: research corpora restored to BRIX `/room/research/` (were stranded on StarHouse after the 2026-05-29 room-relocate). The deferred cross-corpus `mappings/` actually has 14 files.
+- Repaired the off-node sync gap: research corpora restored to the room research store [internal-path-removed] (were stranded on StarHouse after the 2026-05-29 room-relocate). The deferred cross-corpus `mappings/` actually has 14 files.
 - Closed the stale `handoff/synapse-nomic-build-starhouse-2026-06-02` (index already built).
 ```
 
@@ -1186,7 +1186,7 @@ tags: [zephyr, validation, attribution, interledger, pilot-doctrine, positioning
 
 A signal, not a ratified decision. Dan Priest, PwC's Chief AI Officer, on *The Most Interesting Thing in AI* (2026-06-17, "How AI Agents Are Changing Business", 30:46, host Nicholas Thompson). The episode keeps landing on Zephyr's own thesis from the enterprise-advisory side of the table. Three clusters plus the macro frame.
 
-Transcript: `/room/library/podcasts/most-interesting-thing-ai/2026-06-17-how-ai-agents-are-changing-business-pwcs-dan-priest-with-nicholas-thompson.md` (room-rag retrievable, BRIX :8201). Full pull also in mem: `insight/dan-priest-podcast-zephyr-validation-2026-06-17`.
+Transcript: [internal-room-library-path-removed] (room-rag retrievable, BRIX :8201). Full pull also in mem: `insight/dan-priest-podcast-zephyr-validation-2026-06-17`.
 
 ## 1. The bullseye - "register an agent against a task affiliated with a user" [16:11-17:04]
 
@@ -1267,4 +1267,4 @@ decision/nostr-underlying-rails-not-community-2026-10-10
 Ruled by Erah 2026-10-10 evening follow-in: Nostr is an underlying additional protocol beneath Seams, never a destination and never a community to court - the existing Nostr scene is doubted as warm to Seams. The migration thesis is Reddit-first; onboarding is keys-in relays-hidden: set your keys up, join Seams, you are done, no clients and no relay thinking. Purpose sentence for the pitch: decentralized collaboration on research and development and/or productization. Open scout question: whether any AI development communities exist on Nostr at all.
 ```
 
-Full gap statement + checklist: `04-open-gaps.md` §4. Claude prepares the decision memo; Erah rules.
+Full gap statement + checklist: `04-open-gaps.md` §4 [excluded from public seed]. Claude prepares the decision memo; Erah rules.

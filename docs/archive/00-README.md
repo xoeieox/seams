@@ -1,14 +1,14 @@
 # 00 — SEAMS: Canonical Protocol Packet — README
 
 Packet: SEAMS / 2026-10-12 / keeper, dispatch "Seams packet builder v2 (sources restored)".
-Landing: GW `reports/seams-packet-2026-10-12/` (working copy) + BRIX `/room/research/seams-protocol-packet-2026-10-12/` (canonical, same day).
-Every source was verified alive the same day; anything named in the dispatch that turned out stale is logged — with its real substitute — in `04-open-gaps.md` §6. Nothing was silently dropped.
+Landing: working copy [internal-path-removed] + canonical store [internal-path-removed] (same day).
+Every source was verified alive the same day; anything named in the dispatch that turned out stale is logged — with its real substitute — in `04-open-gaps.md` §6 [excluded from public seed]. Nothing was silently dropped.
 
 ---
 
 ## What Seams is
 
-From the anchor doc (BRIX `/room/research/consent-attribution/zephyr-seams-anchor-2026-09-29.md`, verbatim):
+From the anchor doc ([internal-anchor-doc-removed], verbatim):
 
 > - Zephyr: a consent-attribution ledger — signed deposits, receipts, attestations over content-hashed works; it keeps hashes, not bytes. Seams: the attribution protocol + payment rails + launcher, one brand (decision/seams-forward-name-zephyr-plus-rails-2026-09-08).
 > - The consent rail v0 shipped 2026-09-28/29: signed, revocable use declarations on works, tri-state permitted/denied/undeclared, public mirror github.com/xoeieox/zephyr (project/zephyr-consent-rail-shipped-2026-09-29).
@@ -37,10 +37,10 @@ Claude (running in its walled VM, subscription started 2026-10-12, walls held: *
 | File | Contains | Primary sources |
 |---|---|---|
 | `00-README.md` | This file — purpose, mission, hygiene | anchor doc, audit, 2026-10-12 harvest |
-| `01-protocol-core.md` | The protocol proper: zephyr repo README + spec essentials (route-manifest v0, hardening, executor foundation, use-terms-consent v0) + km-seed `protocol/` (mesh-protocol, invariants, signing, store-ownership, shared-corpus) + conform schema + tests inventory + lock status | `/room/planning/specs/`, `/data/git/knowledge-mesh-seed-working/`, `/data/git/zephyr*/` |
+| `01-protocol-core.md` | The protocol proper: zephyr repo README + spec essentials (route-manifest v0, hardening, executor foundation, use-terms-consent v0) + km-seed `protocol/` (mesh-protocol, invariants, signing, store-ownership, shared-corpus) + conform schema + tests inventory + lock status | [internal-path-removed] |
 | `02-attribution-payment.md` | The attribution→payment rail: 2026-07-20 rail design (verbatim), ratified mem.db entries, Rafiki-testnet settlement proof, consent docs, km-seed protocol/signing + store-ownership, knowledge-mesh seed-packet decision record, OP-vs-Nostr gap statement | vault Lapis/, mem.db, km-seed repo |
-| `03-economics.md` | STRATEGY substitute (Seams-Business-Strategy-Synthesis 2026-08-25), mesh economics substitutes (settlement-model key, memo2 pricing, camp-fee), 2026-10-12 harvest economics harvest (free-tier freeze, person-as-product, platform-as-club, MVP-with-store) | vault Lapis/, mem.db, harvests/ |
-| `04-open-gaps.md` | The audit's gap list verbatim, consent items 2–9 verbatim, key-certificate verification, OP-vs-Nostr ruling pending, seed-repo LICENSE absence, stale-source register, lock checklist | audit, anchor doc, mem.db |
+| `03-economics.md` [excluded from public seed] | STRATEGY substitute (Seams-Business-Strategy-Synthesis 2026-08-25), mesh economics substitutes (settlement-model key, memo2 pricing, camp-fee), 2026-10-12 harvest economics harvest (free-tier freeze, person-as-product, platform-as-club, MVP-with-store) | vault Lapis/, mem.db, harvests/ |
+| `04-open-gaps.md` [excluded from public seed] | The audit's gap list verbatim, consent items 2–9 verbatim, key-certificate verification, OP-vs-Nostr ruling pending, seed-repo LICENSE absence, stale-source register, lock checklist | audit, anchor doc, mem.db |
 
 ## Hygiene rules for pasting into Claude
 
@@ -50,10 +50,10 @@ Claude (running in its walled VM, subscription started 2026-10-12, walls held: *
 4. **Ratification is Erah-only.** No paste may instruct Claude to flip a status line to RATIFIED, mint keys, or choose the payment surface. (Doc-write *proposals* for these are in scope; the flip is not.)
 5. **Exclusions already applied.** Per audit §F, this packet deliberately contains NO: outreach/personal-identity files (ai-alliance/osaif emails — Erah contact aliases + funding asks), funder-intel (cg-initiatives-resonance), testnet wallet key ids (infra/zephyr-testnet-wallets-connection), finance/debt rows, adult-platform sibling docs, Mansion's Personal/-linked material, fundraising posture, or Mac personal material. If a follow-up paste needs one of those, that is an Erah decision, not a convenience.
 6. **Integrity check before long sessions.** Compare the BRIX-side sha256sums (recorded at landing, reported at assembly) against what was pasted.
-7. **Quarantine drift.** If anything in a session contradicts this packet's verified paths/keys, re-verify against the register in `04-open-gaps.md` §6 before trusting either.
+7. **Quarantine drift.** If anything in a session contradicts this packet's verified paths/keys, re-verify against the register in `04-open-gaps.md` §6 [excluded from public seed] before trusting either.
 
 ## Integrity
 
 - GW audit source: sha256 `f9454f34a503e2f1dc287555ec4e475a2344fb8354463e9a3c8641d130bb1736` — computed at assembly, matches dispatch-expected `f9454f34...`.
-- Per-file sha256sums: recorded on the BRIX side at landing time (`/room/research/seams-protocol-packet-2026-10-12/`), reported to the requester.
+- Per-file sha256sums: recorded on the canonical-store side at landing time ([internal-path-removed]), reported to the requester.
 - BRIX access during assembly: strictly read-only except the one mkdir + the five file copies into the new packet directory.

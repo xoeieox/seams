@@ -1,6 +1,6 @@
 # Wire draft: authorship claims, vouches, rulings and platform keys
 
-*Seams, 2026-10-14. **DRAFT, proposed.** Not built, no vectors yet. Extends `WIRE-V0.md` §9 (suggested works). Design reasoning and Erah's words are in `Seams_Protocol/seams/CLAIMS-AND-ATTESTATION-DESIGN-2026-10-14.md`. Marks: **[Erah]** is a ruling on record; **[Proposed]** is Seams' choice for Erah to react to.*
+*Seams, 2026-10-14. **DRAFT, proposed.** Not built, no vectors yet. Extends `WIRE-V0.md` §9 (suggested works). Design reasoning and Erah's words are in `Seams_Protocol/seams/CLAIMS-AND-ATTESTATION-DESIGN-2026-10-14.md` (not included in this seed). Marks: **[Erah]** is a ruling on record; **[Proposed]** is Seams' choice for Erah to react to.*
 
 ## What Erah ruled, and what this draft rests on
 
