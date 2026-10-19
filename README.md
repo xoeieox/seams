@@ -15,8 +15,7 @@ once - a signed, consent-first, fail-closed wire on which a work carries
 who made it, what use is permitted, and where value routes. The protocol
 layer is opinionless by design: it moves signed messages about consent,
 attribution, and compensation ratios, and the morals and decisions stay
-with the entities on the ends of the wire - the vertical owns the stack,
-the horizontal owns the protocol. It is also the referee: a deterministic
+with the entities on the ends of the wire. It is also the referee: a deterministic
 battle-test kit that checks any implementation against the protocol's
 counted vectors. This repo is a seed, not a product - the protocol
 contract, its invariants, the vector suite that pins behavior, and a
