@@ -1,0 +1,55 @@
+SEAMS protocol-version seed, 2026-10-19 (tag v0.3-draft-seed.1)
+
+This file lines up where every seeded artifact came from. Hashes are
+sha256. The seed was assembled per the bound seed spec (v2, 2026-10-19)
+and every pinned source was verified byte-identical at seed time.
+
+Kit (spec/, kit/, kit/vectors/, kit/stub/)
+  Source: the seams battle kit, delivered 2026-10-16 as
+  seams-battle-kit.tar.gz (225,774 B), sha256
+  7fb9dd12904c07e659c64134cfe918791fbe5c9b60e32390be6007f183677adc
+  (verified at seed time). Every kit file in this repo is byte-identical
+  to that kit tree. kit/README.md ships with its known vector-count prose
+  drift (it says 127; the counted truth is 131) - tracked for the next
+  migration pass.
+
+Vectors
+  Canonical home for this cut: kit/vectors/ in this repo (8 suites,
+  131 counted cases, pinned by kit/vectors/MANIFEST.sha256). Upstream
+  flat copies of the same bytes exist in the keeper research archive
+  intake of 2026-10-16.
+
+Docs (narrative)
+  Source: the SEAMS protocol packet of 2026-10-12, sections 01-04 plus the
+  original packet README, shipped byte-identical as hash-pinned lineage
+  under docs/ (the original README is archived at docs/archive/00-README.md
+  because its hand-this-folder framing predates this repo's audience).
+  Combined packet handoff (all sections verbatim, 427,135 B), sha256
+  546e0f9d2521b3f3ddc99160438ab26eaa5f59b633380854c5cb44f430b875ac
+  (verified at seed time).
+
+Helper (pointer, not vendored)
+  zephyr public mirror 537d90f, branch seams/wire-helper, commit f054d0f.
+  POINTER ONLY - mirror existence unverified at seed time, the branch's
+  canonical home is unresolved, and helper parity is unverified. See
+  HELPER.md. The helper's vendored dependency (archetypes-core, Apache-2.0)
+  is not carried in this repo for the same reason.
+
+Protocol decisions carried by this seed (decision ledger keys, with dates)
+  decision/seams-rulings-2026-10-17 (2026-10-17) - A-ratifications
+  (A1, A2, A3, A4, A6 ratified; the fifth addition HELD, excluded from
+  canon), zero-amount disposition at the record boundary, vector-suite
+  reconciliation ask.
+  decision/seams-wire-rail-field-naming-2026-10-14 (2026-10-14) - rail
+  field naming; see spec/FIELD-NAMING.md.
+  decision/seams-is-the-knowledge-mesh-platform-name-2026-08-03
+  (2026-08-03, backfilled 2026-08-08) - SEAMS is the platform name.
+  decision/seams-release-ruling-ship-now-local-ai-rd-first-slice-2026-10-16
+  (2026-10-16) - release ruling; the local-AI R&D platform is the first
+  slice; audiences by demonstrated behavior.
+  decision/seams-voluntary-consent-no-scrape-seeding-2026-08-28
+  (2026-08-28) - consent invariant: no scraping social media to seed the
+  platform; imports of external content are voluntary and user-initiated.
+
+The full decision narrative these keys carry is re-exported (curated,
+protocol-relevant rows) at docs/PROTOCOL-DECISIONS.md.

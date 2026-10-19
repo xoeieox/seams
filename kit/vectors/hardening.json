@@ -1,0 +1,608 @@
+{
+ "fixture": {
+  "works": {
+   "sha256:fixture-farmer": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-paladin": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-pinup": {
+    "creator": "key:creator-x"
+   },
+   "sha256:fixture-v0-row": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-unpublished": {
+    "creator": "key:creator-a",
+    "published": false
+   },
+   "sha256:fixture-revoked": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-baker": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-adventurous-baker": {
+    "creator": "key:player-b",
+    "parents": [
+     "sha256:fixture-baker"
+    ]
+   },
+   "sha256:fixture-limited": {
+    "creator": "key:creator-x"
+   }
+  },
+  "declarations": [
+   {
+    "subject": "*",
+    "declared_by": "key:creator-a",
+    "denied_uses": [
+     "training"
+    ],
+    "contexts": {
+     "taxonomy": "lapis-rpg/0",
+     "allow": [
+      {
+       "tag": "violence/*",
+       "max_tier": 2
+      }
+     ],
+     "deny": [],
+     "hard_limits": []
+    },
+    "note": "Creator A default policy"
+   },
+   {
+    "subject": "sha256:fixture-farmer",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "fork",
+     "remix",
+     "context"
+    ],
+    "origin": {
+     "fork": "played"
+    },
+    "note": "Grow my farmer through play; no desk rewrites of their story."
+   },
+   {
+    "subject": "sha256:fixture-farmer",
+    "declared_by": "key:squatter",
+    "allowed_uses": [
+     "training"
+    ],
+    "note": "squatter, must be ignored"
+   },
+   {
+    "subject": "sha256:fixture-paladin",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "remix"
+    ]
+   },
+   {
+    "subject": "sha256:fixture-paladin",
+    "aspect": "magic",
+    "declared_by": "key:creator-a",
+    "denied_uses": [
+     "remix"
+    ],
+    "note": "Remix the paladin, not their magic system."
+   },
+   {
+    "subject": "*",
+    "declared_by": "key:creator-x",
+    "allowed_uses": [
+     "context",
+     "fork"
+    ],
+    "contexts": {
+     "taxonomy": "adult-platform/0",
+     "allow": [
+      {
+       "tag": "mature/*",
+       "max_tier": 3
+      }
+     ],
+     "deny": [
+      "mature/degradation"
+     ],
+     "hard_limits": [
+      "mature/non-consent"
+     ]
+    },
+    "note": "Creator X adult-account default policy"
+   },
+   {
+    "subject": "sha256:fixture-v0-row",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "remix"
+    ],
+    "denied_uses": [
+     "training"
+    ],
+    "scope": "standing",
+    "revokes": false,
+    "note": ""
+   },
+   {
+    "subject": "sha256:fixture-revoked",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "redistribution"
+    ]
+   },
+   {
+    "subject": "sha256:fixture-revoked",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [],
+    "denied_uses": [],
+    "revokes": true
+   },
+   {
+    "subject": "sha256:fixture-baker",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "remix",
+     "context"
+    ],
+    "contexts": {
+     "taxonomy": "lapis-rpg/0",
+     "allow": [],
+     "deny": [],
+     "hard_limits": [
+      "mature/*"
+     ]
+    },
+    "note": "My baker is just a baker. Never in mature scenes."
+   },
+   {
+    "subject": "sha256:fixture-adventurous-baker",
+    "declared_by": "key:player-b",
+    "allowed_uses": [
+     "fork",
+     "remix",
+     "training",
+     "context"
+    ],
+    "contexts": {
+     "taxonomy": "lapis-rpg/0",
+     "allow": [
+      {
+       "tag": "mature/*"
+      },
+      {
+       "tag": "violence/*"
+      }
+     ],
+     "deny": [],
+     "hard_limits": []
+    },
+    "note": "Remixer tries to open everything up."
+   },
+   {
+    "subject": "sha256:fixture-limited",
+    "declared_by": "key:creator-x",
+    "contexts": {
+     "taxonomy": "adult-platform/0",
+     "allow": [
+      {
+       "tag": "mature/*",
+       "max_tier": 3,
+       "min_profile": "platform"
+      }
+     ],
+     "deny": [],
+     "hard_limits": []
+    },
+    "note": "Mature scenes only on platform-enforced surfaces."
+   }
+  ]
+ },
+ "cases": [
+  {
+   "name": "tier is required",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:player-b",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "original"
+   },
+   "expect": {
+    "error": "bad_tier"
+   }
+  },
+  {
+   "name": "tier GM in the wrong case is refused, never deposited",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:player-b",
+    "tier": "GM",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "original"
+   },
+   "expect": {
+    "error": "bad_tier"
+   }
+  },
+  {
+   "name": "unknown kind",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:player-b",
+    "tier": "player",
+    "kind": "persona",
+    "content_b64": "eA==",
+    "derivation": "original"
+   },
+   "expect": {
+    "error": "unknown_kind"
+   }
+  },
+  {
+   "name": "campaign is a kind",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:player-b",
+    "tier": "player",
+    "kind": "campaign",
+    "content_b64": "eA==",
+    "derivation": "original"
+   },
+   "expect": {
+    "status": "deposited"
+   }
+  },
+  {
+   "name": "origin must be authored, assisted or played",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:player-b",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "original",
+    "provenance": {
+     "origin": "desk"
+    }
+   },
+   "expect": {
+    "error": "bad_origin"
+   }
+  },
+  {
+   "name": "an original with parents is refused, so a fork cannot skip the parent check by calling itself original",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:player-b",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "original",
+    "parents": [
+     "sha256:fixture-farmer"
+    ],
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "error": "parents_on_original"
+   }
+  },
+  {
+   "name": "identical bytes from another key do not take the work",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:creator-a",
+     "tier": "player",
+     "kind": "character",
+     "content_b64": "eA==",
+     "derivation": "original"
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squatter",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "original"
+   },
+   "expect": {
+    "error": "already_deposited"
+   }
+  },
+  {
+   "name": "the same key may re-emit identical bytes",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:creator-a",
+     "tier": "player",
+     "kind": "character",
+     "content_b64": "eA==",
+     "derivation": "original"
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:creator-a",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "original"
+   },
+   "expect": {
+    "status": "deposited"
+   }
+  },
+  {
+   "name": "declare on an unknown work",
+   "request": {
+    "op": "declare",
+    "creator_key_ref": "key:creator-a",
+    "use_terms": {
+     "subject": "sha256:nobody",
+     "allowed_uses": [
+      "remix"
+     ]
+    }
+   },
+   "expect": {
+    "error": "unknown_work"
+   }
+  },
+  {
+   "name": "check_use without a work is an error, not a crash",
+   "request": {
+    "op": "check_use",
+    "capability": "view"
+   },
+   "expect": {
+    "error": "bad_request"
+   }
+  },
+  {
+   "name": "emit without content is an error",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:player-b",
+    "tier": "player",
+    "kind": "character"
+   },
+   "expect": {
+    "error": "bad_request"
+   }
+  },
+  {
+   "name": "unknown op",
+   "request": {
+    "op": "nope"
+   },
+   "expect": {
+    "error": "unknown_op"
+   }
+  },
+  {
+   "name": "hello lists the ops and their standing",
+   "request": {
+    "op": "hello"
+   },
+   "expect": {
+    "ops": {
+     "emit": "locked",
+     "get_lineage": "proposed",
+     "record_link": "proposed"
+    }
+   }
+  },
+  {
+   "name": "lineage up: a remix and its parent",
+   "request": {
+    "op": "get_lineage",
+    "work": "sha256:fixture-adventurous-baker",
+    "direction": "up"
+   },
+   "expect": {
+    "status": "ok",
+    "nodes": [
+     {
+      "content_hash": "sha256:fixture-adventurous-baker",
+      "parents": [
+       "sha256:fixture-baker"
+      ]
+     },
+     {
+      "content_hash": "sha256:fixture-baker",
+      "parents": []
+     }
+    ],
+    "edges": [
+     {
+      "child": "sha256:fixture-adventurous-baker",
+      "parent": "sha256:fixture-baker"
+     }
+    ]
+   }
+  },
+  {
+   "name": "lineage down: what was made from the baker",
+   "request": {
+    "op": "get_lineage",
+    "work": "sha256:fixture-baker",
+    "direction": "down"
+   },
+   "expect": {
+    "nodes": [
+     {
+      "content_hash": "sha256:fixture-baker"
+     },
+     {
+      "content_hash": "sha256:fixture-adventurous-baker"
+     }
+    ]
+   }
+  },
+  {
+   "name": "lineage of an unknown work",
+   "request": {
+    "op": "get_lineage",
+    "work": "sha256:nobody"
+   },
+   "expect": {
+    "error": "unknown_work"
+   }
+  },
+  {
+   "name": "a creator links their work to another work",
+   "request": {
+    "op": "record_link",
+    "creator_key_ref": "key:creator-a",
+    "from": "sha256:fixture-farmer",
+    "to": "sha256:fixture-paladin",
+    "relation": "uses",
+    "pinned": true
+   },
+   "expect": {
+    "status": "linked"
+   }
+  },
+  {
+   "name": "links read back from both ends",
+   "setup": [
+    {
+     "op": "record_link",
+     "creator_key_ref": "key:creator-a",
+     "from": "sha256:fixture-farmer",
+     "to": "sha256:fixture-paladin",
+     "relation": "uses",
+     "pinned": true
+    }
+   ],
+   "request": {
+    "op": "get_links",
+    "work": "sha256:fixture-paladin"
+   },
+   "expect": {
+    "links": [
+     {
+      "from": "sha256:fixture-farmer",
+      "to": "sha256:fixture-paladin",
+      "relation": "uses",
+      "pinned": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "only the linking work's creator can record its links",
+   "request": {
+    "op": "record_link",
+    "creator_key_ref": "key:squatter",
+    "from": "sha256:fixture-farmer",
+    "to": "sha256:fixture-paladin",
+    "relation": "uses"
+   },
+   "expect": {
+    "error": "not_creator"
+   }
+  },
+  {
+   "name": "relation must be uses or contains",
+   "request": {
+    "op": "record_link",
+    "creator_key_ref": "key:creator-a",
+    "from": "sha256:fixture-farmer",
+    "to": "sha256:fixture-paladin",
+    "relation": "derives"
+   },
+   "expect": {
+    "error": "bad_relation"
+   }
+  },
+  {
+   "name": "a link carries no consent: paladin fork stays undeclared",
+   "setup": [
+    {
+     "op": "record_link",
+     "creator_key_ref": "key:creator-a",
+     "from": "sha256:fixture-farmer",
+     "to": "sha256:fixture-paladin",
+     "relation": "uses"
+    }
+   ],
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-paladin",
+    "capability": "fork"
+   },
+   "expect": {
+    "verdict": "undeclared"
+   }
+  },
+  {
+   "name": "event_ref that is a list is an error, not a crash",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fixture-farmer",
+    "event_ref": [],
+    "amount": {
+     "value": 100,
+     "asset_code": "USD",
+     "asset_scale": 2
+    }
+   },
+   "expect": {
+    "error": "bad_request"
+   }
+  },
+  {
+   "name": "event_ref beyond 64 bits is an error, not a crash",
+   "request": {
+    "op": "record_value_event",
+    "work": "sha256:fixture-farmer",
+    "event_ref": 9223372036854775808,
+    "amount": {
+     "value": 100,
+     "asset_code": "USD",
+     "asset_scale": 2
+    }
+   },
+   "expect": {
+    "error": "bad_request"
+   }
+  },
+  {
+   "name": "provenance that is a string is an error",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:player-b",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "original",
+    "provenance": "AAAA"
+   },
+   "expect": {
+    "error": "bad_request"
+   }
+  },
+  {
+   "name": "use_terms that is a string is an error",
+   "request": {
+    "op": "declare",
+    "creator_key_ref": "key:creator-a",
+    "use_terms": "AAAA"
+   },
+   "expect": {
+    "error": "bad_request"
+   }
+  }
+ ]
+}

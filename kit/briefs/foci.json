@@ -1,0 +1,57 @@
+[
+ {
+  "id": "money-conservation",
+  "title": "Money must add up and unpaid legs must stay",
+  "fixture": "payments",
+  "instruction": "Attack invariants N4 and N5. Find amounts, rounding ties, odd scales and event replays where payer_retained + legs != amount, where a leg with no wallet is dropped or its amount moved to someone else, or where a receipt disagrees with its leg. Fixture works fx-derived, fx-parent, fx-tie, fx-g1..g3, fx-bare have declared splits; keys D, M, A, B, C have wallets; P does not."
+ },
+ {
+  "id": "money-exogenous",
+  "title": "The amount is exogenous and shares are only ever declared",
+  "fixture": "payments",
+  "instruction": "Attack N1, N2 and N7. Try to make a quote or event with a missing, zero, negative, boolean, float, string or oversized amount succeed; try to get a share that nobody declared; try to make the split change with the amount; try to get money data out of emit, declare or check_use."
+ },
+ {
+  "id": "money-keys-custody",
+  "title": "Nobody else's wallet, no custodian, no keys in responses",
+  "fixture": "payments",
+  "instruction": "Attack N6 and N9. Try to route to a wallet that is not the beneficiary's own, name a platform or escrow as beneficiary, make one recipient get two legs, supply your own signer/agent_id/pubkey fields on writes, or provoke any response that contains key material."
+ },
+ {
+  "id": "creator-only",
+  "title": "Only the creator's key counts",
+  "fixture": "emit",
+  "instruction": "Attack A4 and A5. Act as a squatter key: declare terms, splits and links on works you did not create; re-emit identical content hoping to become its creator; emit with tier gm in every spelling; claim attributed_to someone else. A declaration by a non-creator must never change a verdict."
+ },
+ {
+  "id": "consent-resolution",
+  "title": "Consent verdicts: aspects, origins, contexts, inheritance",
+  "fixture": "check_use",
+  "instruction": "Attack the verdict logic with check_use. Look for a case where deny does not beat allow, a parent's denial is ignored by a child, a context tag over a hard limit is permitted, an aspect falls through the wrong chain, or an error comes back looking like a verdict (A1). Compare what the specification says with what comes back."
+ },
+ {
+  "id": "emit-hardening",
+  "title": "Emit and declare fail closed",
+  "fixture": "hardening",
+  "instruction": "Attack emit and declare with malformed and hostile input: bad tier, bad kind, bad origin, parents on an original, missing parents on a fork, duplicate content, unknown parents, cycles, enormous content. Every one must be a clean refusal or error, never a deposit of something invalid and never a crash (A2)."
+ },
+ {
+  "id": "suggested-works",
+  "title": "Imported works with no author of record",
+  "fixture": "suggested",
+  "instruction": "Attack the suggested-work rules: an import must be credited to the importer only, must be open for fork/remix/view/context only at the protocol default, must never gain training or redistribution, must never gain splits, and attributed_to must never become verified or move the creator."
+ },
+ {
+  "id": "lineage-links",
+  "title": "Lineage and links carry attribution, never consent or money",
+  "fixture": "hardening",
+  "instruction": "Attack get_lineage, record_link and get_links: unknown works, huge depth, direction typos, links that try to create consent, links by non-creators, link cycles, duplicate links. A link must never change a check_use verdict or a quote_route result."
+ },
+ {
+  "id": "malformed-fuzz",
+  "title": "Anything malformed must be a clean error",
+  "fixture": "",
+  "opener": "Begin with hello, then go straight to malformed input. No fixture is loaded; build any state you need with emit.",
+  "instruction": "Attack A1, A2 and A3 only. Send wrong types for every field of every op, deeply nested values, very long strings, unicode and control characters, extra fields, unknown ops, an op that is a number, an empty object. Every answer must be a JSON object with the wire version; errors must never contain a verdict."
+ }
+]

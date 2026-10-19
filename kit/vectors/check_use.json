@@ -1,0 +1,832 @@
+{
+ "wire": "seams-wire/0.1-draft",
+ "about": "check_use vectors. Each case starts from the fixture, runs setup steps, then compares only the keys in expect.",
+ "fixture": {
+  "works": {
+   "sha256:fixture-farmer": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-paladin": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-pinup": {
+    "creator": "key:creator-x"
+   },
+   "sha256:fixture-v0-row": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-unpublished": {
+    "creator": "key:creator-a",
+    "published": false
+   },
+   "sha256:fixture-revoked": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-baker": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-adventurous-baker": {
+    "creator": "key:player-b",
+    "parents": [
+     "sha256:fixture-baker"
+    ]
+   },
+   "sha256:fixture-limited": {
+    "creator": "key:creator-x"
+   }
+  },
+  "declarations": [
+   {
+    "subject": "*",
+    "declared_by": "key:creator-a",
+    "denied_uses": [
+     "training"
+    ],
+    "contexts": {
+     "taxonomy": "lapis-rpg/0",
+     "allow": [
+      {
+       "tag": "violence/*",
+       "max_tier": 2
+      }
+     ],
+     "deny": [],
+     "hard_limits": []
+    },
+    "note": "Creator A default policy"
+   },
+   {
+    "subject": "sha256:fixture-farmer",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "fork",
+     "remix",
+     "context"
+    ],
+    "origin": {
+     "fork": "played"
+    },
+    "note": "Grow my farmer through play; no desk rewrites of their story."
+   },
+   {
+    "subject": "sha256:fixture-farmer",
+    "declared_by": "key:squatter",
+    "allowed_uses": [
+     "training"
+    ],
+    "note": "squatter, must be ignored"
+   },
+   {
+    "subject": "sha256:fixture-paladin",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "remix"
+    ]
+   },
+   {
+    "subject": "sha256:fixture-paladin",
+    "aspect": "magic",
+    "declared_by": "key:creator-a",
+    "denied_uses": [
+     "remix"
+    ],
+    "note": "Remix the paladin, not their magic system."
+   },
+   {
+    "subject": "*",
+    "declared_by": "key:creator-x",
+    "allowed_uses": [
+     "context",
+     "fork"
+    ],
+    "contexts": {
+     "taxonomy": "adult-platform/0",
+     "allow": [
+      {
+       "tag": "mature/*",
+       "max_tier": 3
+      }
+     ],
+     "deny": [
+      "mature/degradation"
+     ],
+     "hard_limits": [
+      "mature/non-consent"
+     ]
+    },
+    "note": "Creator X adult-account default policy"
+   },
+   {
+    "subject": "sha256:fixture-v0-row",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "remix"
+    ],
+    "denied_uses": [
+     "training"
+    ],
+    "scope": "standing",
+    "revokes": false,
+    "note": ""
+   },
+   {
+    "subject": "sha256:fixture-revoked",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "redistribution"
+    ]
+   },
+   {
+    "subject": "sha256:fixture-revoked",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [],
+    "denied_uses": [],
+    "revokes": true
+   },
+   {
+    "subject": "sha256:fixture-baker",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "remix",
+     "context"
+    ],
+    "contexts": {
+     "taxonomy": "lapis-rpg/0",
+     "allow": [],
+     "deny": [],
+     "hard_limits": [
+      "mature/*"
+     ]
+    },
+    "note": "My baker is just a baker. Never in mature scenes."
+   },
+   {
+    "subject": "sha256:fixture-adventurous-baker",
+    "declared_by": "key:player-b",
+    "allowed_uses": [
+     "fork",
+     "remix",
+     "training",
+     "context"
+    ],
+    "contexts": {
+     "taxonomy": "lapis-rpg/0",
+     "allow": [
+      {
+       "tag": "mature/*"
+      },
+      {
+       "tag": "violence/*"
+      }
+     ],
+     "deny": [],
+     "hard_limits": []
+    },
+    "note": "Remixer tries to open everything up."
+   },
+   {
+    "subject": "sha256:fixture-limited",
+    "declared_by": "key:creator-x",
+    "contexts": {
+     "taxonomy": "adult-platform/0",
+     "allow": [
+      {
+       "tag": "mature/*",
+       "max_tier": 3,
+       "min_profile": "platform"
+      }
+     ],
+     "deny": [],
+     "hard_limits": []
+    },
+    "note": "Mature scenes only on platform-enforced surfaces."
+   }
+  ]
+ },
+ "cases": [
+  {
+   "name": "view of a published work is free",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "view"
+   },
+   "expect": {
+    "verdict": "permitted",
+    "decided_by": {
+     "level": "protocol_default"
+    }
+   }
+  },
+  {
+   "name": "view of an unpublished work is not",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-unpublished",
+    "capability": "view"
+   },
+   "expect": {
+    "verdict": "undeclared",
+    "decided_by": {
+     "level": "protocol_default"
+    }
+   }
+  },
+  {
+   "name": "unknown work is undeclared",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:never-seen",
+    "capability": "view"
+   },
+   "expect": {
+    "verdict": "undeclared",
+    "decided_by": {
+     "level": "unknown_work"
+    }
+   }
+  },
+  {
+   "name": "remix granted on the work",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "remix"
+   },
+   "expect": {
+    "verdict": "permitted",
+    "decided_by": {
+     "level": "work"
+    }
+   }
+  },
+  {
+   "name": "play-fork passes the origin filter",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "fork",
+    "origin": "played"
+   },
+   "expect": {
+    "verdict": "permitted",
+    "decided_by": {
+     "level": "work"
+    }
+   }
+  },
+  {
+   "name": "desk fork fails the origin filter",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "fork",
+    "origin": "authored"
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "origin_filter"
+    }
+   }
+  },
+  {
+   "name": "fork with no origin fails a filtered grant",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "fork"
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "origin_filter"
+    }
+   }
+  },
+  {
+   "name": "training denied by default policy; squatter's grant ignored",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "training"
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "default_policy"
+    }
+   }
+  },
+  {
+   "name": "redistribution never declared",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "redistribution"
+   },
+   "expect": {
+    "verdict": "undeclared",
+    "decided_by": {
+     "level": "protocol_default"
+    }
+   }
+  },
+  {
+   "name": "aspect with no grant falls through to the work",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-paladin",
+    "capability": "remix",
+    "aspect": "character"
+   },
+   "expect": {
+    "verdict": "permitted",
+    "decided_by": {
+     "level": "work"
+    }
+   }
+  },
+  {
+   "name": "aspect grant overrides the work",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-paladin",
+    "capability": "remix",
+    "aspect": "magic"
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "aspect"
+    }
+   }
+  },
+  {
+   "name": "context within tier ceiling",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "view",
+    "contexts": [
+     {
+      "taxonomy": "lapis-rpg/0",
+      "tag": "violence/combat",
+      "tier": 2
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "permitted",
+    "contexts": [
+     {
+      "tag": "violence/combat",
+      "verdict": "permitted",
+      "level": "default_policy"
+     }
+    ]
+   }
+  },
+  {
+   "name": "context above tier ceiling",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "view",
+    "contexts": [
+     {
+      "taxonomy": "lapis-rpg/0",
+      "tag": "violence/combat",
+      "tier": 3
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "context:default_policy:tier"
+    }
+   }
+  },
+  {
+   "name": "mature is off unless opted in",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "view",
+    "contexts": [
+     {
+      "taxonomy": "lapis-rpg/0",
+      "tag": "mature/sexual",
+      "tier": 1
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "undeclared",
+    "decided_by": {
+     "level": "context:protocol_default"
+    }
+   }
+  },
+  {
+   "name": "adult account opted in",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-pinup",
+    "capability": "view",
+    "contexts": [
+     {
+      "taxonomy": "adult-platform/0",
+      "tag": "mature/explicit",
+      "tier": 2
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "permitted"
+   }
+  },
+  {
+   "name": "deny beats a broader allow",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-pinup",
+    "capability": "view",
+    "contexts": [
+     {
+      "taxonomy": "adult-platform/0",
+      "tag": "mature/degradation",
+      "tier": 1
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "context:default_policy"
+    }
+   }
+  },
+  {
+   "name": "hard limit beats allow",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-pinup",
+    "capability": "view",
+    "contexts": [
+     {
+      "taxonomy": "adult-platform/0",
+      "tag": "mature/non-consent",
+      "tier": 1
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "context:hard_limit"
+    }
+   }
+  },
+  {
+   "name": "protocol floor beats everything",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-pinup",
+    "capability": "view",
+    "contexts": [
+     {
+      "taxonomy": "adult-platform/0",
+      "tag": "floor/minors"
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "context:floor"
+    }
+   }
+  },
+  {
+   "name": "taxonomy mismatch is undeclared",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-pinup",
+    "capability": "view",
+    "contexts": [
+     {
+      "taxonomy": "lapis-rpg/0",
+      "tag": "mature/explicit",
+      "tier": 1
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "undeclared",
+    "decided_by": {
+     "level": "context:protocol_default"
+    }
+   }
+  },
+  {
+   "name": "worst context wins",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-pinup",
+    "capability": "context",
+    "contexts": [
+     {
+      "taxonomy": "adult-platform/0",
+      "tag": "mature/explicit",
+      "tier": 1
+     },
+     {
+      "taxonomy": "adult-platform/0",
+      "tag": "mature/non-consent",
+      "tier": 1
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "context:hard_limit"
+    }
+   }
+  },
+  {
+   "name": "shipped v0 row reads as aspect whole",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-v0-row",
+    "capability": "remix"
+   },
+   "expect": {
+    "verdict": "permitted",
+    "decided_by": {
+     "level": "work"
+    }
+   }
+  },
+  {
+   "name": "shipped v0 row covers aspects by fall-through",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-v0-row",
+    "capability": "remix",
+    "aspect": "character"
+   },
+   "expect": {
+    "verdict": "permitted",
+    "decided_by": {
+     "level": "work"
+    }
+   }
+  },
+  {
+   "name": "tombstone falls through to default policy",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-revoked",
+    "capability": "redistribution"
+   },
+   "expect": {
+    "verdict": "undeclared",
+    "decided_by": {
+     "level": "protocol_default"
+    }
+   }
+  },
+  {
+   "name": "unknown capability is an error, never a verdict",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "share"
+   },
+   "expect": {
+    "error": "unknown_capability"
+   }
+  },
+  {
+   "name": "default policy grants context on adult account",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-pinup",
+    "capability": "context"
+   },
+   "expect": {
+    "verdict": "permitted",
+    "decided_by": {
+     "level": "default_policy"
+    }
+   }
+  },
+  {
+   "name": "a per-work grant cannot loosen a hard limit",
+   "setup": [
+    {
+     "op": "declare",
+     "creator_key_ref": "key:creator-x",
+     "use_terms": {
+      "subject": "sha256:fixture-pinup",
+      "contexts": {
+       "taxonomy": "adult-platform/0",
+       "allow": [
+        {
+         "tag": "mature/non-consent"
+        }
+       ],
+       "deny": [],
+       "hard_limits": []
+      }
+     }
+    }
+   ],
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-pinup",
+    "capability": "view",
+    "contexts": [
+     {
+      "taxonomy": "adult-platform/0",
+      "tag": "mature/non-consent",
+      "tier": 1
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "context:hard_limit"
+    }
+   }
+  },
+  {
+   "name": "revoking a per-work grant falls back to the default",
+   "setup": [
+    {
+     "op": "declare",
+     "creator_key_ref": "key:creator-a",
+     "use_terms": {
+      "subject": "sha256:fixture-farmer",
+      "revokes": true
+     }
+    }
+   ],
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "remix"
+   },
+   "expect": {
+    "verdict": "undeclared",
+    "decided_by": {
+     "level": "protocol_default"
+    }
+   }
+  },
+  {
+   "name": "inherited: a remix can't open training its ancestor denied",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-adventurous-baker",
+    "capability": "training"
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "ancestor:default_policy",
+     "ancestor": "sha256:fixture-baker"
+    }
+   }
+  },
+  {
+   "name": "inherited: a remix can't open a context its ancestor hard-limited",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-adventurous-baker",
+    "capability": "view",
+    "contexts": [
+     {
+      "taxonomy": "lapis-rpg/0",
+      "tag": "mature/sexual",
+      "tier": 1
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "ancestor:context:hard_limit",
+     "ancestor": "sha256:fixture-baker"
+    }
+   }
+  },
+  {
+   "name": "inherited: a remix can't open fork its ancestor never granted",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-adventurous-baker",
+    "capability": "fork",
+    "origin": "played"
+   },
+   "expect": {
+    "verdict": "undeclared",
+    "decided_by": {
+     "level": "ancestor:protocol_default",
+     "ancestor": "sha256:fixture-baker"
+    }
+   }
+  },
+  {
+   "name": "inherited: what both allow is allowed",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-adventurous-baker",
+    "capability": "remix"
+   },
+   "expect": {
+    "verdict": "permitted",
+    "decided_by": {
+     "level": "work"
+    }
+   }
+  },
+  {
+   "name": "inherited: the remix is still playable",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-adventurous-baker",
+    "capability": "view"
+   },
+   "expect": {
+    "verdict": "permitted"
+   }
+  },
+  {
+   "name": "enforcement level: below the creator's minimum is denied",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-limited",
+    "capability": "view",
+    "contexts": [
+     {
+      "taxonomy": "adult-platform/0",
+      "tag": "mature/explicit",
+      "tier": 2
+     }
+    ],
+    "surface_profile": "cloud"
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "context:work:profile"
+    }
+   }
+  },
+  {
+   "name": "enforcement level: no profile given counts as local",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-limited",
+    "capability": "view",
+    "contexts": [
+     {
+      "taxonomy": "adult-platform/0",
+      "tag": "mature/explicit",
+      "tier": 2
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "context:work:profile"
+    }
+   }
+  },
+  {
+   "name": "enforcement level: platform surface meets the minimum",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-limited",
+    "capability": "view",
+    "contexts": [
+     {
+      "taxonomy": "adult-platform/0",
+      "tag": "mature/explicit",
+      "tier": 2
+     }
+    ],
+    "surface_profile": "platform"
+   },
+   "expect": {
+    "verdict": "permitted"
+   }
+  }
+ ]
+}
