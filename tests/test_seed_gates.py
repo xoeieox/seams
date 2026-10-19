@@ -15,7 +15,7 @@ pipeline's default pytest run, so the engine gate is the spec's own DoD gate:
    EXCLUDED-with-citation line), the invariants set is exactly N1-N9 plus
    A1, A2, A3, A4, A6, key material and internal-network literals are zero
    in every tracked file, internal path/username/model-name literals are
-   zero everywhere outside the public-candidate-scrubbed narrative archive under docs/ (03-economics.md and 04-open-gaps.md were dropped from this candidate by owner ruling 2026-10-19),
+   zero everywhere (03-economics.md and 04-open-gaps.md were dropped from this candidate by owner ruling 2026-10-19 15:08 PDT; docs/01-protocol-core.md and docs/02-attribution-payment.md were dropped from the public tree by the same owner ruling on 2026-10-19 15:25 PDT, the closing pass); the sole surviving narrative file under docs/ is the archived original README (docs/archive/00-README.md), which carries the closing-pass scrub and is exempt from the soft classes here,
    and no excluded path category exists in the tree.
 
 Layout note: the spec manifest lists vectors/ and stub/ as root paths, but
@@ -80,8 +80,6 @@ SCRUB_SOFT_PATTERNS = (
 # classes. The hard classes (key material, internal subnets) stay zero
 # everywhere, archive included.
 DOCS_ARCHIVE_EXEMPT = {
-    "docs/01-protocol-core.md",
-    "docs/02-attribution-payment.md",
     "docs/archive/00-README.md",
 }
 
@@ -107,9 +105,7 @@ SPEC_PINNED_FILES = {
     "kit/briefs/foci.json": "13ed24c8b30c06625e91246e9489716b4cd8d6148c6a5f3086eae5d2b2ae9bb3",
     "kit/findings/TEMPLATE.md": "89a6d1d7686ee208dab092c154b0f43b1c10f19520cb58320d281bed81711f32",
     "kit/stub/seams_stub.py": "0f2d59f1ce27ebf36299cad321d76eeb5ad42d49b79353d2bce368bfb549bbda",
-    "docs/01-protocol-core.md": "d45aadee8f2109c93e1046e651f1ca34c1f46cc6cf1a26a93d6ae09d9a112ab4",  # public-candidate scrub 2026-10-19
-    "docs/02-attribution-payment.md": "a0a65fbe5e9b1effe2614c68ef0fda9bcbb15e2e99324a224257be2c5b6436f2",  # public-candidate scrub 2026-10-19
-    "docs/archive/00-README.md": "72add65d600d5b9a6b83f7100f56e907c1a7e2c6b1e26d707de40495507041c0",  # public-candidate scrub 2026-10-19
+    "docs/archive/00-README.md": "f51b27a4042c4a345af85320782d658da85e7553eb1776fc6b8774a906e3de39",  # closing-pass scrub 2026-10-19
 }
 
 NEGATIVE_PATH_RE = re.compile(

@@ -27,6 +27,20 @@ Docs (narrative)
   Combined packet handoff (all sections verbatim, 427,135 B), sha256
   546e0f9d2521b3f3ddc99160438ab26eaa5f59b633380854c5cb44f430b875ac
   (verified at seed time).
+  Two sections of that packet are [removed from public seed, lineage hash
+  retained]: 03-economics.md (sha256
+  7b6645504502ac0ac6da4ed19afd37bbf8d70aab4fc36e7754b799450d85cfee) and
+  04-open-gaps.md (sha256
+  acd0b1ba6922a5e0fb75ca1fe1b493264cbe522ddc897f71c00cbb23ce1a1a94) were
+  judged BLOCKER class for the public mirror (eye-1 review 2026-10-19) and
+  dropped from the public tree by owner ruling 2026-10-19; their
+  upstream lineage is retained here so the packet remains reconstructable
+  from the internal stores, without implying public availability.
+  The two surviving sections (01-protocol-core.md,
+  02-attribution-payment.md) were additionally scrubbed of private
+  path/username literals before this cut (eye-1 FIX-NEXT hits); their
+  pre-scrub byte-identical copies remain in the internal packet, and the
+  scrub was tracked in the seed gate test.
 
 Helper (pointer, not vendored)
   zephyr public mirror 537d90f, branch seams/wire-helper, commit f054d0f.

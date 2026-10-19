@@ -11,7 +11,7 @@ Every source was verified alive the same day; anything named in the dispatch tha
 From the anchor doc ([internal-anchor-doc-removed], verbatim):
 
 > - Zephyr: a consent-attribution ledger — signed deposits, receipts, attestations over content-hashed works; it keeps hashes, not bytes. Seams: the attribution protocol + payment rails + launcher, one brand (decision/seams-forward-name-zephyr-plus-rails-2026-09-08).
-> - The consent rail v0 shipped 2026-09-28/29: signed, revocable use declarations on works, tri-state permitted/denied/undeclared, public mirror github.com/xoeieox/zephyr (project/zephyr-consent-rail-shipped-2026-09-29).
+> - The consent rail v0 shipped 2026-09-28/29: signed, revocable use declarations on works, tri-state permitted/denied/undeclared, public mirror github.com/[maintainer]/zephyr (project/zephyr-consent-rail-shipped-2026-09-29).
 > - Doctrine anchors upstream: consent is co-equal axis to attribution upstream of route-not-compute (decision/zephyr-consent-coequal-axis-attribution-2026-07-08); Zephyr is a committed build, not dispute-gated (decision/zephyr-committed-build-not-dispute-gated-2026-09-28).
 
 And from the protocol assembly audit (GW `reports/2026-10-12-protocol-assembly-audit.md`, sha256 `f9454f34…`, verified):
@@ -37,8 +37,8 @@ Claude (running in its walled VM, subscription started 2026-10-12, walls held: *
 | File | Contains | Primary sources |
 |---|---|---|
 | `00-README.md` | This file — purpose, mission, hygiene | anchor doc, audit, 2026-10-12 harvest |
-| `01-protocol-core.md` | The protocol proper: zephyr repo README + spec essentials (route-manifest v0, hardening, executor foundation, use-terms-consent v0) + km-seed `protocol/` (mesh-protocol, invariants, signing, store-ownership, shared-corpus) + conform schema + tests inventory + lock status | [internal-path-removed] |
-| `02-attribution-payment.md` | The attribution→payment rail: 2026-07-20 rail design (verbatim), ratified mem.db entries, Rafiki-testnet settlement proof, consent docs, km-seed protocol/signing + store-ownership, knowledge-mesh seed-packet decision record, OP-vs-Nostr gap statement | vault Lapis/, mem.db, km-seed repo |
+| `01-protocol-core.md` [removed from public seed, lineage hash retained] | The protocol proper: zephyr repo README + spec essentials (route-manifest v0, hardening, executor foundation, use-terms-consent v0) + km-seed `protocol/` (mesh-protocol, invariants, signing, store-ownership, shared-corpus) + conform schema + tests inventory + lock status | [internal-path-removed] |
+| `02-attribution-payment.md` [removed from public seed, lineage hash retained] | The attribution→payment rail: 2026-07-20 rail design (verbatim), ratified mem.db entries, Rafiki-testnet settlement proof, consent docs, km-seed protocol/signing + store-ownership, knowledge-mesh seed-packet decision record, OP-vs-Nostr gap statement | vault Lapis/, mem.db, km-seed repo |
 | `03-economics.md` [excluded from public seed] | STRATEGY substitute (Seams-Business-Strategy-Synthesis 2026-08-25), mesh economics substitutes (settlement-model key, memo2 pricing, camp-fee), 2026-10-12 harvest economics harvest (free-tier freeze, person-as-product, platform-as-club, MVP-with-store) | vault Lapis/, mem.db, harvests/ |
 | `04-open-gaps.md` [excluded from public seed] | The audit's gap list verbatim, consent items 2–9 verbatim, key-certificate verification, OP-vs-Nostr ruling pending, seed-repo LICENSE absence, stale-source register, lock checklist | audit, anchor doc, mem.db |
 
