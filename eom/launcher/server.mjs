@@ -40,7 +40,7 @@ if (!loopbackOnly(NODE_ONE_URL)) {
 fs.mkdirSync(OPS_DIR, { recursive: true });
 
 const HEADERS = {
-  'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store',
 };
 const send = (res, code, body, type = 'application/json; charset=utf-8') => {
@@ -54,6 +54,12 @@ const STATIC = {
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/app.css': ['app.css', 'text/css; charset=utf-8'],
   '/launcher-core.mjs': ['../launcher-core.mjs', 'text/javascript; charset=utf-8'],
+  // PWA shell (installable app window). sw.js caches THESE only - never /api, /ops, /agent (see public/sw.js).
+  '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json; charset=utf-8'],
+  '/sw.js': ['sw.js', 'text/javascript; charset=utf-8'],
+  '/icons/icon-192.png': ['icons/icon-192.png', 'image/png'],
+  '/icons/icon-512.png': ['icons/icon-512.png', 'image/png'],
+  '/icons/apple-touch-icon.png': ['icons/apple-touch-icon.png', 'image/png'],
 };
 const OPS_FILES = new Set(['node.yaml', 'declarations.yaml', 'parts.json']);
 const OPS_DEFAULTS = {
@@ -171,4 +177,14 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, '127.0.0.1', () => {
   const port = (server.address() || {}).port || PORT;
   console.log(`seams-launcher listening on http://127.0.0.1:${port} (local only; node-one ${NODE_ONE_URL}; ops ${OPS_DIR}; wire pin ${WIRE_PIN})`);
+});
+// Port hygiene: a second start on a taken port is an already-running launcher, not a crash.
+// (launch.mjs probes first; this catches the race and the bare `node server.mjs` path Erah hit today.)
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    console.log(`seams-launcher already running on 127.0.0.1:${PORT} - open http://127.0.0.1:${PORT} (nothing new started; if that is not the launcher, free the port or set PORT= and run again)`);
+    process.exit(0);
+  }
+  console.error(`seams-launcher could not listen on 127.0.0.1:${PORT}: ${err && err.message ? err.message : err}`);
+  process.exit(1);
 });

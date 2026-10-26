@@ -720,3 +720,8 @@ function render() {
 // first open = the living README (the setup walkthrough), on the same tabs.
 render();
 loadCfg();
+
+// PWA app shell: register the service worker. sw.js caches static assets only (network-first)
+// and steps aside from every dynamic route (/api, /ops, /agent, /health) - freshness by hash means
+// nothing the server can change today is ever answered from yesterday's cache.
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
