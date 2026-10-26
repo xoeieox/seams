@@ -4,8 +4,10 @@
 # same-day smoke verdict - the kind gate maps text/page payloads to session-log AT the gate and the
 # accept set stays closed; hashes stay opaque until the deposits-spec ruling lands.
 # This file states requirements only; implementation lives in eom/node-one/attributed-text
-# (server.mjs routes + lib.mjs Store). Local/loopback operation is the only authorized posture:
-# see blocked_on at the bottom - the exposure leg needs the host/exposure ruling, not code.
+# (server.mjs routes + lib.mjs Store). Local/loopback operation remains the only LIVE posture:
+# the host/exposure ruling landed 2026-10-26 ~13:42 PDT (folded at host_exposure_ruling below)
+# and the tunnel wiring is PLANNED ONLY - eom/endpoint-surface/deploy-prep-cloudflare-demo.md is
+# the Tuesday plan Erah reviews before anything public exists. Nothing external has been created.
 
 surface: eom/node-one/attributed-text
 wire: seams-wire/0.3-draft
@@ -83,12 +85,79 @@ join_gate:
     burn_policy: validation/gate refusals and store rejections do not consume budget; only successful mutations charge (peek/charge split)
     defaults: { edit_limit: 10, ingest_limit: 30, global_limit: 80, window_ms: 600000 }
   transport:
-    bind: 127.0.0.1 only (BIND_HOST) - until the host/exposure ruling
-    admin_token: never echoed to stdout; 0600 file under DATA_DIR only (T1 lesson)
+    bind: 127.0.0.1 only (BIND_HOST) - ruled 2026-10-26, stays loopback even behind the demo tunnel (cloudflared runs on-box and proxies to the loopback port; the server never binds a public interface)
+    forwarded_headers: never read - true also behind the demo tunnel; no TRUSTED_PROXY exists and no reverse proxy is allowed to exist to re-open the question
+    admin_token: never echoed to stdout; 0600 file under DATA_DIR only (T1 lesson); custody bridge and target in host_exposure_ruling below
 
-blocked_on_host_exposure_ruling:
-  # The only things this leg still needs that ONLY the exposure ruling can provide:
-  - final bind address / port / TLS or tunnel topology (and whether any reverse proxy is allowed to exist, which would re-open the forwarded-header question under a TRUSTED_PROXY allowlist, off by default)
-  - which party holds the admin token and how it is delivered out-of-band (it is deliberately never printed, never exported, never in data payloads)
-  - whether rate-limit budgets change once the socket is not loopback (loopback today means one operator; exposure means many)
-  - whether /api/export stays public or moves behind the same gate as emit once there is a second node to read it
+# ---------------------------------------------------------------------------
+# host/exposure ruling - Erah 2026-10-26 ~13:42 PDT (four items), folded here
+# by the code seat the same day. This section RESOLVES the former
+# blocked_on_host_exposure_ruling (bind/TLS/tunnel topology; admin-token
+# custody; budget posture; export visibility - all four now ruled). Loopback
+# remains the only live posture; the external wiring is plan-only until Erah
+# signs the Tuesday plan (eom/endpoint-surface/deploy-prep-cloudflare-demo.md).
+# ---------------------------------------------------------------------------
+host_exposure_ruling:
+  ruled_by: Erah
+  ruled_at: 2026-10-26 ~13:42 PDT
+  topology:
+    tunnel: CLOUDFLARE TUNNEL FOR THE MONTH-END DEMO ONLY - explicitly labeled DEMO
+      PLUMBING, not architecture. Switter lesson on record (Cloudflare walk 2018 plus
+      the 2022 OSA episode killed it - a single-vendor kill-switch is not an acceptable
+      steady state, so multi-posture (moving off Cloudflare) is the LATER REQUIREMENT,
+      tracked as an obligation in the deploy-prep plan.
+    reverse_proxy: none exists and none is allowed - TRUSTED_PROXY stays absent and
+      the allowlist mechanism stays unbuilt; forwarded headers (cf-connecting-ip /
+      x-forwarded-for) stay unread even behind the demo tunnel, because the connector
+      is not an authenticating proxy and its headers are treated as attacker-controlled
+      like any other.
+    origin_bind: BIND_HOST stays 127.0.0.1 - cloudflared runs on the box and proxies
+      to the loopback port (verified 2026-10-26 against the cloudflared README - the
+      daemon attracts client requests from the Cloudflare network and sends them to
+      the origin without firewall holes, so the origin stays closed). Public reach
+      never means the server binds a public interface.
+    socket_keying_consequence: because forwarded headers stay unread, every tunneled
+      visitor arrives on the SAME socket key (the connector's localhost connection).
+      Per-socket numbers therefore govern direct/local clients only; the GLOBAL
+      buckets are the effective public ceiling for the demo. Stated honestly here and
+      in the README - this is an accepted cost of the no-header-trust ruling.
+  rate:
+    posture: two tiers - GENEROUS READ (hello / export / static) and PRICED WRITE
+      (edit / ingest); admin attempts keep charging up front (failed-token retries are
+      the attack priced there); the peek/charge split stays (refusals never burn
+      budget, only successes charge). Matches the 1F916 read-free/write-cap shape;
+      that Cloudflare-bill anecdote is memory-only and UNVERIFIED - it motivated the
+      shape, it is not evidence and must not be cited as corpus.
+    measured_today: reads charge nothing (no read bucket exists in server.mjs - this
+      is the measured behavior the README describes); edit 10 / ingest 30 / global 80
+      per socket per 10 min; admin 10 attempts per socket per 10 min charged up front.
+    proposed_public_posture:   # PROPOSED - Erah-RATIFY required before Tuesday wiring
+      window_ms: 600000        # 10 min, unchanged
+      read_limit: 300          # per socket key per 10 min across hello/export/static
+      read_global_limit: 1500  # all socket keys per 10 min - the effective public
+                               # ceiling under the tunnel (see socket_keying_consequence)
+      ingest_limit: 10         # per socket key per 10 min - TIGHTENED from 30 for the
+                               # public posture; an honest node emits far slower
+      edit_limit: 10           # unchanged
+      global_limit: 80         # write-global, all socket keys per 10 min - unchanged
+      admin_limit: 10          # attempts (success or not) per socket key per 10 min,
+                               # charged up front - unchanged
+    status: PROPOSED numbers. Implementation stays exactly as measured_today (reads
+      uncharged, ingest 30) until Erah ratifies; landing the read tier is a code
+      change with its own tests, not this docs fold.
+  token_custody:
+    bridge_now: the machinery holds the capped temp token ON-BOX (DATA_DIR/admin-token.txt,
+      mode 0600, or ADMIN_TOKEN in the operator environment) until the launcher+Y1 mint
+      lands. Capped means scoped - it grants exactly the admin revert power, is never
+      printed, never exported, never appears in data payloads, and is replaceable.
+    target: the OWNER holds root on a hardware key (YubiKey; the Y1 hardware-signer
+      seam - spike green 2026-08-13, HELD 2026-09-01, to be un-parked via the Seams
+      launcher) and the machinery acts ONLY under bounded leases. The lease-over-root-key
+      object (a bounded grant signed at mint by the hardware key, so machinery never
+      holds root) is the documented target - a new-build prefigured by doorman leases
+      and human-vouch-at-mint, never yet defined, buildable in the launcher. Written up
+      in the node README custody section; when launcher+Y1 mint lands, the on-box 0600
+      bridge token retires.
+  export:
+    visibility: PUBLIC (ruled 2026-10-26). The second node reads /api/export ungated;
+      the only refusal that stands is the REQ-EXPORT-3 503 log_integrity gate.
