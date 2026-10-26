@@ -10,11 +10,13 @@
 // the PWA shell (manifest parses/standalone/icons real; SW caches the static shell ONLY - /api,
 // /ops, /agent, /health are never intercepted), icon determinism, and launch.mjs (ONE command:
 // spawns+supervises both servers, ctrl-c reaps both ps-verified, a busy port is REUSE with a
-// clear message and no EADDRINUSE stack trace). Fifteen tests; every server the suite starts is
+// clear message and no EADDRINUSE stack trace). And the Tauri shell (Erah's ruling
+// 16:11 PDT - Kyma-style Mac iteration): scaffold consistency, the zero-frontend-deps rule,
+// and the one-command Mac bundle. Eighteen tests; every server the suite starts is
 // killed and ps-verified gone.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -445,6 +447,86 @@ test('port hygiene: second launch REUSES with a clear message - no EADDRINUSE, n
     first.proc.kill('SIGINT');
     await waitForExit(first.proc, 5000).catch(() => { first.proc.kill('SIGKILL'); });
   }
+});
+
+// ---------------- 11-13. the Tauri shell (static validation - no cargo on this host) ----------------
+const TAURI_DIR = path.join(here, '..', 'tauri');
+const BUNDLE_SH = path.join(here, '..', 'scripts', 'make-mac-bundle.sh');
+
+test('tauri shell: scaffold is consistent - config, capability, rust, icons, gitignore', () => {
+  const read = (p) => fs.readFileSync(path.join(TAURI_DIR, p), 'utf8');
+  const conf = JSON.parse(read('src-tauri/tauri.conf.json'));
+  assert.equal(conf.productName, 'Seams Launcher');
+  assert.equal(conf.identifier, 'app.seams.launcher');
+  assert.match(conf.build.devUrl, /^http:\/\/127\.0\.0\.1:\d+$/, 'devUrl is loopback only');
+  const dist = path.resolve(TAURI_DIR, 'src-tauri', conf.build.frontendDist);
+  assert.ok(fs.existsSync(path.join(dist, 'index.html')), 'frontendDist resolves to the REAL public/ (zero fork)');
+  assert.ok(fs.existsSync(path.join(dist, 'manifest.webmanifest')), 'same PWA the browser gets');
+  const lib = read('src-tauri/src/lib.rs');
+  assert.match(lib, /fn launch_mjs/, 'locates launch.mjs itself');
+  assert.match(lib, /SEAMS_LAUNCHER_DIR/, 'explicit override for where launch.mjs lives');
+  assert.match(lib, /Duration::from_secs\(3\)/, 'reap grace: SIGTERM then SIGKILL after 3s');
+  assert.match(lib, /SIGKILL|kill\(.*-9|Command::new\("kill"\)/, 'the SIGKILL rung exists');
+  assert.match(lib, /Node.js required/, 'honest missing-node panel, never a blank white window');
+  assert.match(lib, /CloseRequested/, 'close reaps the sidecar');
+  assert.match(lib, /ExitRequested/, 'exit reaps the sidecar');
+  assert.match(lib, /seams:\/\/localhost\/node-missing/, 'panels served over a private scheme');
+  assert.match(lib, /127\.0\.0\.1/, 'the shell dials loopback, nothing else');
+  assert.doesNotMatch(lib, /\breqwest::|https?:\/\/(?!127\.0\.0\.1)[a-z]/, 'no external fetches from the shell');
+  assert.doesNotMatch(lib, /0\.0\.0\.0/, 'no non-loopback address anywhere');
+  const main = read('src-tauri/src/main.rs');
+  assert.match(main, /app_lib::run\(\)/, 'thin binary, logic in the lib (Tauri 2 convention)');
+  const cargo = read('src-tauri/Cargo.toml');
+  const depLines = [];
+  let inDep = false;
+  for (const l of cargo.split('\n')) {
+    if (/^\s*\[dependencies\]\s*$/.test(l)) { inDep = true; continue; }
+    if (inDep && /^\s*\[/.test(l)) break;
+    if (inDep) { const t = l.trim(); if (t && !t.startsWith('#')) depLines.push(t); }
+  }
+  assert.deepEqual(depLines, ['tauri = { version = "2", features = [] }'], 'runtime Cargo deps are EXACTLY tauri v2 - no plugins, no extra crates');
+  assert.ok(/^tauri-build\s*=\s*\{\s*version\s*=\s*"2"/m.test(cargo), 'tauri-build present as build-dependency only');
+  const cap = JSON.parse(read('src-tauri/capabilities/default.json'));
+  assert.deepEqual(cap.permissions, ['core:default'], 'the webview gets core:default and nothing more - no IPC surface');
+  assert.deepEqual(cap.windows, ['main']);
+  const ign = read('src-tauri/.gitignore');
+  for (const pat of ['/target/', '/gen/', '/Cargo.lock', '.icns', '.ico']) {
+    assert.ok(ign.includes(pat), 'gitignore covers ' + pat);
+  }
+  const png = fs.readFileSync(path.join(TAURI_DIR, 'src-tauri/icons/icon.png'));
+  assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', 'source flame icon is a real PNG');
+});
+
+test('package.json: the scripts exist and the runtime stays zero-dependency', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(here, '..', 'package.json'), 'utf8'));
+  for (const s of ['dev', 'test', 'tauri', 'tauri:build']) {
+    assert.ok(pkg.scripts[s], `script ${s} exists`);
+  }
+  assert.match(pkg.scripts.test, /node --test test\/launcher\.test\.mjs/, 'test is the one launcher suite file');
+  assert.match(pkg.scripts.tauri, /@tauri-apps\/cli dev/);
+  assert.match(pkg.scripts['tauri:build'], /@tauri-apps\/cli build/);
+  assert.ok(!pkg.dependencies || Object.keys(pkg.dependencies).length === 0, 'zero runtime deps holds');
+  assert.ok(pkg.devDependencies['@tauri-apps/cli'], 'dev-only tauri CLI');
+  assert.deepEqual(Object.keys(pkg.devDependencies), ['@tauri-apps/cli'], 'and it is the ONLY dev dep');
+});
+
+test('make-mac-bundle.sh: one command -> verified, self-describing tarball the Mac can unpack', () => {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'seams-bundle-'));
+  execFileSync('bash', [BUNDLE_SH], { env: { ...process.env, SEAMS_BUNDLE_DIR: out, SEAMS_LAUNCHER_DIR: path.join(here, '..') } });
+  const tar = path.join(out, 'seams-launcher-mac-latest.tar.gz');
+  const side = path.join(out, 'seams-launcher-mac-latest.tar.gz.sha256');
+  assert.ok(fs.existsSync(tar) && fs.existsSync(side), 'tarball + sha256 sidecar land at stable paths');
+  execFileSync('sha256sum', ['-c', path.basename(side)], { cwd: out });
+  const listing = execFileSync('tar', ['-tzf', tar], { encoding: 'utf8' });
+  for (const req of ['seams-launcher/launch.mjs', 'seams-launcher/server.mjs', 'seams-launcher/public/index.html',
+    'seams-launcher/tauri/src-tauri/src/lib.rs', 'seams-launcher/tauri/src-tauri/icons/icon.png',
+    'seams-launcher/scripts/make-mac-bundle.sh']) {
+    assert.ok(listing.includes(req), 'tarball carries ' + req);
+  }
+  for (const banned of ['/target/', '/node_modules/', '/ops/', '/.DS_Store']) {
+    assert.ok(!listing.includes(banned), 'tarball excludes ' + banned);
+  }
+  fs.rmSync(out, { recursive: true, force: true });
 });
 
 // ---------------- 10. must-never surface scan on what ships to the browser ----------------
