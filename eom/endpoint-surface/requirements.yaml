@@ -1,0 +1,94 @@
+# EoM node-one endpoint surface - requirements (build leg, Erah GO 2026-10-26 ~11:11 PDT)
+# Scope: the three public-facing endpoints of the node-one attributed-text demo (hello / emit /
+# export) plus the join gate the emit route rides. Rulings baked in: plan v2 (2026-10-26) and the
+# same-day smoke verdict - the kind gate maps text/page payloads to session-log AT the gate and the
+# accept set stays closed; hashes stay opaque until the deposits-spec ruling lands.
+# This file states requirements only; implementation lives in eom/node-one/attributed-text
+# (server.mjs routes + lib.mjs Store). Local/loopback operation is the only authorized posture:
+# see blocked_on at the bottom - the exposure leg needs the host/exposure ruling, not code.
+
+surface: eom/node-one/attributed-text
+wire: seams-wire/0.3-draft
+format: seams-attribution-log/0-eom.1
+
+endpoints:
+  hello:
+    method: GET
+    path: /api/hello
+    purpose: join handshake + A3-style version echo
+    requirements:
+      - id: REQ-HELLO-1
+        rule: response must echo the wire version the server actually speaks (wire field); clients pin it and refuse to speak past a skew
+      - id: REQ-HELLO-2
+        rule: response must advertise the closed kind gate exactly - accept set {node-key, session-log} plus the text/page -> session-log mapping - so a joining node learns the rails before it emits
+      - id: REQ-HELLO-3
+        rule: unauthenticated, unratecharged; exposes no token material, no IPs, no file paths beyond the operator's own data dir
+      - id: REQ-HELLO-4
+        rule: must report integrity state (ok vs QUARANTINED) so a peer never discovers a corrupted log by emitting into it
+  emit:
+    method: POST
+    path: /api/ingest
+    purpose: one wire-shaped emit deposited through the join gate (op must be "emit")
+    requirements:
+      - id: REQ-EMIT-1
+        rule: "fail-closed gate: accepted kinds are exactly {node-key, session-log}; kind values text and page map to session-log per the 2026-10-26 ruling; everything else - including unknown kinds and text-with-header shapes (kind text/html or a headers field) - is refused with unknown_kind, never defaulted"
+      - id: REQ-EMIT-2
+        rule: idempotence keyed on the payload hash (sha256 over the canonical body); a replay is acked duplicate:true with the ORIGINAL receipt, byte-identical, and grows nothing - across restarts too (receipts sidecar)
+      - id: REQ-EMIT-3
+        rule: receipt carries opaque payload_hash/content_hash/deposit_hash computed ONCE at append; the server never re-hashes on read (no hash laundering)
+      - id: REQ-EMIT-4
+        rule: node_key must be well-formed (key:<ref>, 3-64 chars, [A-Za-z0-9._-]); the registry stores node_key/who/first_seen/seen and NEVER an IP
+      - id: REQ-EMIT-5
+        rule: fork/remix (derivation != original, or parents on an original) is refused consent_gate_unbuilt (501) until the consent layer exists - fail closed, no half-open accept
+      - id: REQ-EMIT-6
+        rule: provenance.origin restricted to authored|assisted|played; unknown origins refused bad_origin
+      - id: REQ-EMIT-7
+        rule: identity squatting refused - bytes already deposited by another key ack already_deposited (409), never re-attributed
+      - id: REQ-EMIT-8
+        rule: content bounds enforced (<= 8000 chars, <= 64 KB body); empty-after-clean refused
+      - id: REQ-EMIT-9
+        rule: every response echoes wire (A3-style), including refusals
+  export:
+    method: GET
+    path: /api/export
+    purpose: the whole append-only attribution log, wire-shaped, for the other node to read
+    requirements:
+      - id: REQ-EXPORT-1
+        rule: entries carry wire-shaped fields (op, kind, v, ts, content_hash, deposit_hash, parents, derivation, creator_ref, creator_verified:false, provenance, use_terms) with hash-chain state alongside, NOT inside the wire fields
+      - id: REQ-EXPORT-2
+        rule: parents are ALWAYS [] - a version chain is not a derivation; ordering is carried by the chain block (n, prev, hash); clients must not infer lineage from parents
+      - id: REQ-EXPORT-3
+        rule: export REFUSES (503 log_integrity) when the load-time chain verification flagged tampering or the anchor disagrees - a tampered log is quarantined and never served, and hashes are never silently recomputed to make it verify (T5a lesson)
+      - id: REQ-EXPORT-4
+        rule: corrupt (unparseable) lines go to quarantine.jsonl at load; boot never crashes on them (A2 spirit) and they never silently vanish from the audit trail
+      - id: REQ-EXPORT-5
+        rule: hashes stay opaque placeholders (sha256 with a load-stable salt) until the deposits-spec ruling fixes their definition; creator_verified stays false until the identity/keys ruling lands
+
+join_gate:
+  accept_kinds: [node-key, session-log]
+  payload_mapping:
+    text: session-log   # Erah ruling 2026-10-26: map text/page payloads to session-log at the gate
+    page: session-log   # rails stay closed; no new wire kind is created by the mapping
+  refuse:
+    - unknown kind (unknown_kind, 400) - including transport-flavored kinds and text-with-header shapes
+    - op other than emit (unknown_op, 400)
+    - malformed node_key (bad_node_key, 400)
+    - derivation fork/remix (consent_gate_unbuilt, 501)
+    - parents on an original (parents_on_original, 400)
+    - provenance.origin outside authored|assisted|played (bad_origin, 400)
+    - cross-key replay of identical bytes (already_deposited, 409)
+    - empty or over-long content (empty 400 / too_long 413), oversize body (too_big 413), bad base64 (bad_content 400)
+  rate:
+    keying: socket peer address ONLY - cf-connecting-ip / x-forwarded-for are attacker-controlled and never read (T1 lesson, smoke 2026-10-26)
+    burn_policy: validation/gate refusals and store rejections do not consume budget; only successful mutations charge (peek/charge split)
+    defaults: { edit_limit: 10, ingest_limit: 30, global_limit: 80, window_ms: 600000 }
+  transport:
+    bind: 127.0.0.1 only (BIND_HOST) - until the host/exposure ruling
+    admin_token: never echoed to stdout; 0600 file under DATA_DIR only (T1 lesson)
+
+blocked_on_host_exposure_ruling:
+  # The only things this leg still needs that ONLY the exposure ruling can provide:
+  - final bind address / port / TLS or tunnel topology (and whether any reverse proxy is allowed to exist, which would re-open the forwarded-header question under a TRUSTED_PROXY allowlist, off by default)
+  - which party holds the admin token and how it is delivered out-of-band (it is deliberately never printed, never exported, never in data payloads)
+  - whether rate-limit budgets change once the socket is not loopback (loopback today means one operator; exposure means many)
+  - whether /api/export stays public or moves behind the same gate as emit once there is a second node to read it
