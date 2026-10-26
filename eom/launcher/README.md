@@ -62,10 +62,11 @@ freshness-by-hash doctrine at the front door of the app.
 **November — double-click.** A packaged `.app` / `.exe` / `.AppImage` with a bundled
 runtime: **no Node needed, no terminal needed**, an icon in Applications that performs the
 same loopback dance internally. That packaging removes exactly what v0 requires: the Node
-install and the command line. The packager choice — **Tauri** (small binary, Rust shell,
-system webview) vs **Electron** (bigger, self-contained webview, most-proven path) — is
-**flagged as Erah’s decision**; the zero-dep vanilla posture (no bundler, no framework, no
-build step — a packager would wrap `launch.mjs` + `public/` unchanged) keeps both doors open.
+install and the command line. The Tauri shell under `tauri/` (see
+[Running on your Mac](#running-on-your-mac-kyma-style-iteration)) is the Kyma-style
+iteration vehicle *today* — it still requires Node on the box. The November step is the
+*packaged* tier: bundling the Node runtime + `launch.mjs` + `node-one/` + `public/` into
+the app's `resources/` so the double-click works with no terminal and no Node install.
 
 **The guided setup is not a separate wizard — it is the first-open window.** The living
 README walkthrough *is* the guided setup, walking the same rails the tabs walk: **Keys**
@@ -125,6 +126,66 @@ carry one of exactly two labels:
 `launcher-core.mjs` `claim(label, text, ok, note)` refuses to construct a claim
 without a label. There is no code path that renders a claim bare.
 
+## Running on your Mac (Kyma-style iteration)
+
+Erah's ruling 2026-10-26 16:11 PDT: the PWA install prompt did not appear in his browser,
+so the native path is the Mac story — Tauri, same as Kyma, iterate on the laptop.
+
+The `tauri/` directory is a **thin Rust shell, not a fork of the frontend**. It loads the
+exact same UI (`devUrl http://127.0.0.1:4173` → the launcher server) in a chromeless
+tall window (380×640, min 360×560 — the 2a shape), and **supervises the servers for
+you**: on launch it finds and spawns `node launch.mjs` (which spawns node-one + the
+launcher, or cleanly reuses ports already up); on window close it SIGTERMs *its own child
+only* (SIGKILL after a 3 s grace). A server we did not start is never ours to stop.
+If `node` is not on PATH the window opens an honest **“Node.js required”** panel served
+over a private `seams://` scheme — no fake success, no browser tab.
+
+**Loopback-only holds**: the shell binds nothing; everything stays on 127.0.0.1. Zero JS
+runtime dependencies; the only npm dep is dev-only `@tauri-apps/cli`.
+
+### One-command delivery from BRIX
+
+```bash
+scripts/make-mac-bundle.sh     # writes /data/eom-bundles/seams-launcher-mac-latest.tar.gz + .sha256
+```
+
+### On the Mac (Kyma-style loop)
+
+Prereqs once: [Xcode CLT](https://developer.apple.com/xcode/#tools) (`xcode-select
+--install`), a system webview (comes with macOS), and Rust via
+[`rustup`](https://rustup.rs) — Tauri's prerequisite list lives in
+[Tauri's official guide](https://tauri.app/start/prerequisites/).
+
+```bash
+# <brix> = the box that built the bundle; same shape as the port-forward note above
+scp <you>@<brix>:/data/eom-bundles/seams-launcher-mac-latest.tar.gz{,.sha256} ~/Downloads/
+cd ~/Downloads && sha256sum -c seams-launcher-mac-latest.tar.gz.sha256   # must print OK
+tar xzf seams-launcher-mac-latest.tar.gz && cd seams-launcher
+npm install            # dev-only CLI; runtime stays zero-dep
+npm test               # the launcher suite travels with the bundle (18 tests)
+npm run tauri          # iterate: Rust compiles once (~minutes), then window + live UI (tauri dev)
+npm run tauri:build    # later: the .app artifact (unsigned, see below)
+```
+
+`tauri dev` expects the launcher server up at 127.0.0.1:4173 — the Rust sidecar starts it
+via `launch.mjs`; if you already run `node launch.mjs` in a terminal, the shell reuses
+those ports. `SEAMS_LAUNCHER_DIR` overrides where the shell finds `launch.mjs`.
+
+### What this shell cannot yet claim (honesty labels)
+
+- **Not signed or notarized** — no Apple Developer ID identity exists for this app; a
+  built `.app` runs only via right-click→Open on your own Mac, and a distributed build
+  would need signing + notarization (and a key we do not hold).
+- **No packaged Node runtime** — the double-click/no-terminal tier is November; today the
+  shell requires `node` on PATH and says so honestly when it is missing.
+- **Never cargo-validated here** — the Rust shell has not been compiled (no Rust/cargo on
+  BRIX at build time); first `tauri dev` on the Mac is the true compile gate. The
+  `tauri` crate version is a `^2` range, first-compile-friendly.
+- **No generated icon set committed** — `icons/icon.png` (the flame) rides along;
+  regenerate per-platform icons on the Mac with `npm run tauri:icons`.
+- **Windows/Linux untested** — the config is portable in shape, but only macOS has a
+  consumer; do not claim “cross-platform verified”.
+
 ## MUST-NEVERS honored here
 
 - No payments surface anywhere (compensation is `none` in the wire's terms).
@@ -143,7 +204,9 @@ without a label. There is no code path that renders a claim bare.
 | `launcher-core.mjs` | pure logic: pins, gate checks, refusal render table, holds, queue markdown, conform gaps, config parse/render |
 | `public/index.html` · `public/app.js` · `public/app.css` | the window |
 | `public/manifest.webmanifest` · `public/sw.js` · `public/icons/` | PWA shell: standalone install, app-shell-only cache (never `/api`), generated flame icons |
+| `scripts/make-mac-bundle.sh` | packs this dir into one sha256-summed tarball for the Mac (Kyma-style iteration) |
 | `scripts/make-icons.mjs` | regenerates the icons deterministically, zero deps (pure-zlib PNG encoder) |
+| `tauri/` | **Tauri 2 native shell**: Rust sidecar supervisor around `launch.mjs`, Erah's Kyma-style Mac iteration path (see below) |
 | `test/launcher.test.mjs` | the launcher test suite (`node --test`) |
 | `design-handoff-2026-10-26/` | canonicalized Claude Design handoff (8 files + CHECKSUMS) |
 
