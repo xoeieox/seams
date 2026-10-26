@@ -4,7 +4,7 @@ A demo of the attribution part of Seams. One page of text anyone can edit. Every
 
 Zero dependencies, Node 18+.
 
-This copy is the **EoM build leg** (node-one, branch `eom-node-one`): the kit plus the build-GO items of 2026-10-26 - a fail-closed ingest gate for wire-shaped emits, an append-only hash chain with load-time quarantine, and the T1 pre-exposure hardening. It runs **local/loopback only**; exposure is a separate ruling.
+This copy is the **EoM build leg** (node-one, branch `eom-node-one`): the kit plus the build-GO items of 2026-10-26 - a fail-closed ingest gate for wire-shaped emits, an append-only hash chain with load-time quarantine, and the T1 pre-exposure hardening. It runs **local/loopback only**, and that stays the only live posture. The host/exposure ruling landed 2026-10-26 (~13:42 PDT): the public leg is a Cloudflare Tunnel for the month-end demo, labeled **demo plumbing** - nothing public exists until the wiring plan in `eom/endpoint-surface/deploy-prep-cloudflare-demo.md` passes Erah. That plan is plan-only; nothing external has been executed.
 
 ## Run it
 
@@ -13,11 +13,21 @@ node server.mjs                 # http://127.0.0.1:8080 (loopback bind; BIND_HOS
 PORT=3000 node server.mjs
 ```
 
-The **admin token** is never printed and never leaves the data dir: it lives in `data/admin-token.txt` (mode 0600), or set `ADMIN_TOKEN`. Open `/#/admin` once and paste it to enable "Restore this version" on old versions.
+The **admin token** is never printed and never leaves the data dir: it lives in `data/admin-token.txt` (mode 0600), or set `ADMIN_TOKEN`. Open `/#/admin` once and paste it to enable "Restore this version" on old versions. See **Token custody** below for what holds that token today and what should hold it instead.
 
-Rate limiting keys on the **socket peer address only**. `cf-connecting-ip` / `x-forwarded-for` are attacker-controlled and are never read (T1, smoke 2026-10-26). Validation and gate refusals do not burn rate budget; only successful mutations charge. There is no tunnel guidance here on purpose - the exposure posture waits for the host/exposure ruling.
+Rate limiting keys on the **socket peer address only**. `cf-connecting-ip` / `x-forwarded-for` are attacker-controlled and are never read (T1, smoke 2026-10-26) - including behind the demo tunnel, where the connector is not an authenticating proxy and its headers are treated as attacker-controlled like any other. Validation and gate refusals do not burn rate budget; only successful mutations charge (the peek/charge split). Admin revert **attempts** are the exception and charge up front - failed-token retries are the attack priced there.
+
+**Measured behavior, stated honestly (matches the tests, not the wishlist):** the binary as it runs today charges writes and admin attempts only - the reads (`GET /api/hello`, `GET /api/export`, static) have **no rate bucket at all** under the loopback posture. The ruled public posture is two tiers - a **generous read** tier and a **priced write** tier (the read-generous/write-capped pattern matches the 1F916 anecdote, which is memory-only and **unverified** - it motivated the shape, it is not evidence). Proposed numbers are in `eom/endpoint-surface/requirements.yaml` under `host_exposure_ruling.rate` and are marked **ERAH-RATIFY**; until ratified and implemented, the code keeps the loopback behavior above. One consequence of the no-header-trust ruling, stated plainly: behind the demo tunnel every public visitor arrives on the connector's loopback socket key, so the per-socket tiers govern direct/local clients and the **global buckets are the effective public ceiling**.
+
+**Tunnel posture, one paragraph:** the approved exposure is a Cloudflare Tunnel for the month-end demo, labeled **demo plumbing** - it is wiring, not architecture. There is no reverse proxy and none may appear; `TRUSTED_PROXY` stays absent. Per the Switter lesson (the 2018 Cloudflare walk and the 2022 OSA episode that killed it), a single-vendor kill-switch is not an acceptable steady state: **moving off Cloudflare to a multi-posture setup is the later requirement**, tracked in the deploy-prep doc as an obligation, not a maybe.
 
 **Seed text:** edit `seed.json` (`author`, `text`). It is used only when `data/log.jsonl` does not exist. To reseed, stop the server and delete `data/`. The current seed is Erah's poem.
+
+## Token custody (bridge now, lease target)
+
+**Bridge (today, measured):** the machinery process holds a capped temp token on-box - `data/admin-token.txt`, mode **0600** (or `ADMIN_TOKEN` in the operator's environment). Capped means scoped: it grants exactly one power (admin revert), it is never printed, never exported, never present in data payloads, and it is trivially replaceable. This is a bridge, not the destination.
+
+**Target posture (ruled 2026-10-26):** the **owner** holds the root key on a hardware key (YubiKey - the Y1 hardware-signer seam; spike green 2026-08-13, HELD 2026-09-01, to be un-parked via the Seams launcher), and the machinery acts **only under bounded leases**. The **lease-over-root-key object** - a bounded grant signed at mint by the hardware key, so the root key never sits in machinery hands - is the documented target and a new-build: prefigured by the doorman leases and by human-vouch-at-mint, never yet defined, buildable in the launcher. When the launcher+Y1 mint lands, the on-box 0600 bridge retires. Until then this README is honest about the bridge: on this box, right now, the machinery holds the token.
 
 ## Send something in
 
@@ -36,9 +46,9 @@ The script pins the wire version (`seams-wire/0.3-draft`), checks the A3-style e
 - History: every version, read-only, with colours if toggled. Nothing is deleted.
 - Concurrent edits: if you saved from an old version, the server three-way merges when the changes are far apart, and asks you to reload when they touch.
 - Limits: 10 saves per 10 min per socket-IP, 80 per 10 min overall, 30 emits per 10 min per socket-IP, 8000 characters, 40-character names, 64 KB bodies (`EDIT_LIMIT`, `INGEST_LIMIT`, `GLOBAL_LIMIT`, `WINDOW_MS`).
-- Ingest gate (`POST /api/ingest`, `GET /api/hello`): the closed join surface for wire-shaped emits - see `eom/endpoint-surface/requirements.yaml` for the requirements (hello / emit / export and the join gate).
+- Ingest gate (`POST /api/ingest`, `GET /api/hello`): the closed join surface for wire-shaped emits - see `eom/endpoint-surface/requirements.yaml` for the requirements (hello / emit / export, the join gate, and the folded host/exposure ruling of 2026-10-26).
 - Admin revert: adds a new version equal to an old one (original authorship restored), logged like any edit.
-- `/api/export`: the log as JSON, also linked from the About page.
+- `/api/export`: the log as JSON, also linked from the About page. **Public by the 2026-10-26 ruling** - the only export refusal is the 503 integrity gate below.
 
 ## How authorship works
 
@@ -54,7 +64,7 @@ The accept set is exactly **{node-key, session-log}**. `text` and `page` payload
 
 ### Export format
 
-`/api/export` is `seams-attribution-log/0-eom.1`, echoing the wire `seams-wire/0.3-draft` (A3-style: every ingest/emit response and the hello handshake carry the version the server actually speaks). Entries are shaped after the `emit` fields (`kind`, `parents`, `derivation`, `creator_ref`, `provenance`, `use_terms`), with the build-leg wire-semantics fixes: kind vocabulary enforced at the gate, `parents` always `[]` (a version chain is not a derivation - ordering lives in the `chain` block), hashes opaque placeholders until the deposits-spec ruling lands, and `creator_verified:false` until the identity ruling lands. Export refuses outright on integrity failure.
+`/api/export` is `seams-attribution-log/0-eom.1`, echoing the wire `seams-wire/0.3-draft` (A3-style: every ingest/emit response and the hello handshake carry the version the server actually speaks). Entries are shaped after the `emit` fields (`kind`, `parents`, `derivation`, `creator_ref`, `provenance`, `use_terms`), with the build-leg wire-semantics fixes: kind vocabulary enforced at the gate, `parents` always `[]` (a version chain is not a derivation - ordering lives in the `chain` block), hashes opaque placeholders until the deposits-spec ruling lands, and `creator_verified:false` until the identity ruling lands. Export refuses outright on integrity failure; otherwise it is public (ruled 2026-10-26).
 
 ## Gaps compared with the protocol in design
 
@@ -63,7 +73,9 @@ The accept set is exactly **{node-key, session-log}**. `text` and `page` payload
 - **Diff artefacts.** A small edit can be credited oddly (common words may stay with the earlier author).
 - **No per-aspect consent, revocation or payments.** One fixed grant: anyone may change, nobody is paid. Fork/remix emits are refused outright (501) rather than half-open.
 - **Single process, one JSON-lines file.** No backups; copy `data/` if it matters.
+- **Token custody is on a bridge, not at target.** Machinery holding the on-box 0600 token is the interim; owner-root-on-hardware + bounded leases is the ruled destination (see Token custody).
+- **Read traffic is unbudgeted.** Today's reads carry no rate bucket; that is safe on loopback and priced-in the proposed public posture (Erah-ratify pending).
 
 ## Tests
 
-`npm test` covers the diff, attribution, merge, revert, persistence, export, the closed gate (including the text-with-header refusal), idempotent replay, the version echo, fork refusals, tamper quarantine and export refusal, and the T1 rate-limiting properties (socket keying, spoofed headers ignored, no burn on errors).
+`npm test` covers the diff, attribution, merge, revert, persistence, export, the closed gate (including the text-with-header refusal), idempotent replay, the version echo, fork refusals, tamper quarantine and export refusal, and the T1 rate-limiting properties (socket keying, spoofed headers ignored, no burn on errors, successes charge, admin attempts charge up front, token never printed, token file 0600).
