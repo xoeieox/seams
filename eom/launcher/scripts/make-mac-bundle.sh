@@ -7,7 +7,8 @@
 #
 #   scripts/make-mac-bundle.sh
 #
-# env knobs: SEAMS_BUNDLE_DIR  where the bundle lands (default /data/eom-bundles)
+# env knobs: SEAMS_BUNDLE_DIR  where the bundle lands (default /var/tmp/eom-bundles - reboot-stable,
+#                             the build account may not create dirs under the root-owned /data itself)
 #            SEAMS_LAUNCHER_DIR pack this launcher dir (default <repo>/eom/launcher)
 #            REPO_ROOT          repo root override (default: git toplevel)
 #
@@ -21,7 +22,7 @@ if [ -z "$SRC" ]; then
   REPO="${REPO_ROOT:-$(git -C "$HERE" rev-parse --show-toplevel)}"
   SRC="$REPO/eom/launcher"
 fi
-OUT_DIR="${SEAMS_BUNDLE_DIR:-/data/eom-bundles}"
+OUT_DIR="${SEAMS_BUNDLE_DIR:-/var/tmp/eom-bundles}"
 NAME="seams-launcher-mac-latest"
 BASE="$(basename "$SRC")"
 

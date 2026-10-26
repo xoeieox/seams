@@ -146,7 +146,7 @@ runtime dependencies; the only npm dep is dev-only `@tauri-apps/cli`.
 ### One-command delivery from BRIX
 
 ```bash
-scripts/make-mac-bundle.sh     # writes /data/eom-bundles/seams-launcher-mac-latest.tar.gz + .sha256
+scripts/make-mac-bundle.sh     # writes /var/tmp/eom-bundles/seams-launcher-mac-latest.tar.gz + .sha256
 ```
 
 ### On the Mac (Kyma-style loop)
@@ -158,8 +158,9 @@ Prereqs once: [Xcode CLT](https://developer.apple.com/xcode/#tools) (`xcode-sele
 
 ```bash
 # <brix> = the box that built the bundle; same shape as the port-forward note above
-scp <you>@<brix>:/data/eom-bundles/seams-launcher-mac-latest.tar.gz{,.sha256} ~/Downloads/
+scp <you>@<brix>:/var/tmp/eom-bundles/seams-launcher-mac-latest.tar.gz{,.sha256} ~/Downloads/
 cd ~/Downloads && sha256sum -c seams-launcher-mac-latest.tar.gz.sha256   # must print OK
+# macOS ships shasum, not sha256sum (unless coreutils is installed): shasum -a 256 -c seams-launcher-mac-latest.tar.gz.sha256
 tar xzf seams-launcher-mac-latest.tar.gz && cd seams-launcher
 npm install            # dev-only CLI; runtime stays zero-dep
 npm test               # the launcher suite travels with the bundle (18 tests)
