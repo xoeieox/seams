@@ -78,12 +78,17 @@ test('log persists as append-only jsonl', async () => {
   assert.equal(b.authors().length, 2);
 });
 
-test('export has hash chain and unverified creators', () => {
+test('export: no client-claimed parent chains; hash chain verified; unverified creators', () => {
   const s = mk(); s.edit({ name: 'Bob', text: 'The quick brown fox!', baseV: 1 });
   const x = s.export();
-  assert.equal(x.entries[1].parents[0], x.entries[0].content_hash);
+  // T5a fix: parents are not a provenance mechanism the client may populate;
+  // order and integrity come from the server-side append-only chain.
+  assert.deepEqual(x.entries[0].parents, []);
+  assert.deepEqual(x.entries[1].parents, []);
   assert.equal(x.entries[0].derivation, 'original');
   assert.equal(x.entries[1].creator_verified, false);
+  assert.equal(x.entries[1].provenance.base_version, x.entries[0].v);
+  assert.equal(x.entries[1].chain.prev, x.entries[0].chain.hash);
 });
 
 test('diff and merge basics', () => {

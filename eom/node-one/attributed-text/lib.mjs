@@ -1,9 +1,31 @@
 // Core logic: tokenizing, diffing, authorship, the append-only log. No I/O except the log file.
+// EoM build leg 2026-10-26 (branch eom-node-one): adds the ingest store path, the closed kind gate,
+// a persisted hash chain with an anchor + salt (T5a tamper detection, no re-hash laundering),
+// load-time quarantine instead of crash-on-boot, and deposit-hash-shaped export fields.
 import fs from 'node:fs';
+import path from 'node:path';
 import crypto from 'node:crypto';
 
 export const MAX_TEXT = 8000;
 export const MAX_NAME = 40;
+export const WIRE_VERSION = 'seams-wire/0.3-draft';
+
+// Closed kind gate (Erah ruling 2026-10-26, plan v2): the accept set is exactly {node-key, session-log}.
+// Text/page payloads (the kit's export self-label and the page body) map to session-log AT THE GATE;
+// no new wire kind is created. Unmapped unknown shapes - including a text payload carrying transport
+// metadata (kind "text/html" or a `headers` field, the documented T3 "text-with-header" case) - are
+// refused fail-closed with unknown_kind, never defaulted, never deposited.
+export const GATE_KINDS = ['node-key', 'session-log'];
+export const KIND_MAP = { text: 'session-log', page: 'session-log' };
+const HEADERISH = /^(kind_?headers|headers|content[-_]type)$/i;
+export function mapKind(kind, body = {}) {
+  if (kind == null && (body.text != null || body.content_b64 != null)) return 'session-log'; // page payload
+  if (typeof kind !== 'string') return null;
+  const k = kind.toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(body, 'headers') || HEADERISH.test(k)) return null; // documented refusal
+  if (KIND_MAP[k]) return KIND_MAP[k];
+  return GATE_KINDS.includes(k) ? k : null;
+}
 
 const TOKEN_RE = /\s+|[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*|[^\s\p{L}\p{N}]/gu;
 export const tokenize = (s) => s.match(TOKEN_RE) || [];
@@ -32,6 +54,9 @@ export function diffHunks(a, b) {
   if (!n && !m) return [];
   if (!n || !m || n * m > 4e6) return [{ i1: s, i2: ea, j1: s, j2: eb }];
   const w = m + 1, L = new Uint16Array((n + 1) * w);
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = n - 1 >= 0 ? 0 : 0; j < m; j++)
+      ;
   for (let i = n - 1; i >= 0; i--)
     for (let j = m - 1; j >= 0; j--)
       L[i * w + j] = a[s + i] === b[s + j] ? L[(i + 1) * w + j + 1] + 1 : Math.max(L[(i + 1) * w + j], L[i * w + j + 1]);
@@ -93,31 +118,129 @@ export function attribute(oldObjs, newObjs, exact = false) {
 }
 
 const sha = (s) => 'sha256:' + crypto.createHash('sha256').update(s, 'utf8').digest('hex');
+export const canonical = (v) =>
+  v === null || v === undefined || typeof v !== 'object' ? JSON.stringify(v ?? null)
+    : Array.isArray(v) ? '[' + v.map(canonical).join(',') + ']'
+      : '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + canonical(v[k])).join(',') + '}';
+
+// Deposit-hash shape, same rule the kit's Python stub uses: the deposit hash is the sha256 of the
+// canonical envelope, NOT of the bare text. Still a placeholder algorithm pending the deposits-spec
+// ruling - export says so honestly (T5a lesson: a hash that everything is recomputed from at serve
+// time is decorative; here hashes are computed ONCE at append time, persisted, and verified at load).
+export const depositHash = (env) => sha(canonical(env));
+const chainHash = (salt, prev, payloadObj) => sha(salt + '|' + prev + '|' + canonical(payloadObj));
+
+const ORIGIN_SET = new Set(['authored', 'assisted', 'played']);
+const NODE_KEY_RE = /^key:[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$/i;
+const PAGE_KINDS = new Set(['seed', 'edit', 'revert']);
 
 export class Store {
   constructor(file = null) {
     this.file = file; this.entries = []; this.canon = new Map();
-    if (file && fs.existsSync(file)) {
-      for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-        if (!line.trim()) continue;
-        const e = JSON.parse(line); this.entries.push(e); this._note(e);
+    this.receipts = new Map();          // payload_hash -> receipt (idempotence across restarts)
+    this.nodes = new Map();             // node_key -> {first_seen, seen} (registry; no IPs, ever)
+    this.contentIndex = new Map();      // content_hash -> first depositing node key (squat guard)
+    this.quarantined = [];
+    this.integrity = { ok: true, corrupt: [], tampered: [], anchorOk: true, legacy: false };
+    if (file) fs.mkdirSync(path.dirname(file), { recursive: true });
+    this.salt = this._loadSalt();
+    if (file && fs.existsSync(file)) this._load(file);
+    this._loadReceipts();
+    this._loadNodes();
+    for (const e of this.entries) if (e.kind === 'ingest' && e.content_hash) this.contentIndex.set(e.content_hash, e.name);
+  }
+
+  _dir() { return path.dirname(this.file); }
+  _loadSalt() {
+    if (!this.file) return crypto.randomBytes(16).toString('hex');
+    const f = path.join(this._dir(), 'chain-salt');
+    if (fs.existsSync(f)) return fs.readFileSync(f, 'utf8').trim();
+    const s = crypto.randomBytes(16).toString('hex');
+    fs.writeFileSync(f, s + '\n', { mode: 0o600 });
+    return s;
+  }
+
+  _load(file) {
+    let prevH = 'GENESIS', n = 0;
+    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+      n++; if (!line.trim()) continue;
+      let e;
+      try { e = JSON.parse(line); } catch { this._quarantine(n, line, 'corrupt_json'); continue; }
+      if (!e || typeof e !== 'object' || typeof e.kind !== 'string' || !Array.isArray(e.segs)) {
+        this._quarantine(n, line, 'bad_shape'); continue;
       }
+      if (e.chain) {
+        const { chain, ...payload } = e;
+        const want = chainHash(this.salt, chain.prev, payload);
+        if (chain.hash !== want || chain.prev !== prevH) { this.integrity.tampered.push(e.v ?? n); this.integrity.ok = false; }
+        prevH = chain.hash;
+      } else { e.v = this.entries.length + 1; this.integrity.legacy = true; }
+      this.entries.push(e); this._note(e);
+    }
+    const a = this._readAnchor();
+    if (a) {
+      const head = this.entries[this.entries.length - 1];
+      if (!head?.chain || a.hash !== head.chain.hash || a.n !== this.entries.length) {
+        this.integrity.anchorOk = false; this.integrity.ok = false;
+      }
+    } else if (this.entries.length) {
+      this._writeAnchor(this.entries[this.entries.length - 1]); // legacy bootstrap: anchor from now on
     }
   }
-  _note(e) { if (e.kind !== 'revert') { const k = nameKey(e.name); if (!this.canon.has(k)) this.canon.set(k, e.name); } }
+
+  _quarantine(lineNo, line, reason) {
+    const rec = { line: lineNo, reason, raw: line, seen_at: new Date().toISOString() };
+    this.quarantined.push(rec); this.integrity.corrupt.push(rec);
+    if (this.file) {
+      const qf = path.join(this._dir(), 'quarantine.jsonl');
+      fs.appendFileSync(qf, JSON.stringify(rec) + '\n');
+    }
+  }
+
+  _anchorFile() { return path.join(this._dir(), 'chain-anchor.json'); }
+  _readAnchor() {
+    if (!this.file) return null;
+    try { return JSON.parse(fs.readFileSync(this._anchorFile(), 'utf8')); } catch { return null; }
+  }
+  _writeAnchor(e) {
+    if (!this.file || !e?.chain) return;
+    const f = this._anchorFile(), tmp = f + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify({ n: e.v, hash: e.chain.hash, updated: new Date().toISOString() }) + '\n', { mode: 0o600 });
+    fs.renameSync(tmp, f);
+  }
+
+  _note(e) { if (e.kind === 'edit' || e.kind === 'seed') { const k = nameKey(e.name); if (!this.canon.has(k)) this.canon.set(k, e.name); } }
+
   _append(e) {
+    e.v = this.entries.length + 1;
+    const prev = this.entries[this.entries.length - 1];
+    const prevH = prev?.chain?.hash || 'GENESIS';
+    const { chain, ...payload } = e;
+    e.chain = { n: e.v, prev: prevH, hash: chainHash(this.salt, prevH, payload) };
     this.entries.push(e); this._note(e);
-    if (this.file) fs.appendFileSync(this.file, JSON.stringify(e) + '\n');
+    if (this.file) { fs.appendFileSync(this.file, JSON.stringify(e) + '\n'); this._writeAnchor(e); }
     return e;
   }
-  get head() { return this.entries[this.entries.length - 1]; }
-  get empty() { return this.entries.length === 0; }
-  entry(v) { return this.entries[v - 1]; }
+
+  get head() { for (let i = this.entries.length - 1; i >= 0; i--) if (PAGE_KINDS.has(this.entries[i].kind)) return this.entries[i]; return undefined; }
+  get empty() { return this.head === undefined; }
+  entry(v) { const e = this.entries[v - 1]; return e && e.v === v && PAGE_KINDS.has(e.kind) ? e : undefined; }
 
   seed(text, name) {
     const who = normName(name) || 'Seed';
     const segs = [[cleanText(text), who, 1]];
-    return this._append({ v: 1, ts: new Date().toISOString(), name: who, kind: 'seed', base_v: 0, segs, hunks: [], stats: { added_words: wordCount(segs), removed_words: 0 } });
+    const e = { ts: new Date().toISOString(), name: who, kind: 'seed', base_v: 0, segs, hunks: [], stats: { added_words: wordCount(segs), removed_words: 0 } };
+    this._stamp(e, textOf(segs), `name:${who}`, { origin: 'authored' });
+    return this._append(e);
+  }
+
+  // Persist the wire-shaped hashes ONCE, at append time (the anti-decorative rule).
+  _stamp(e, text, creatorRef, prov) {
+    e.content_hash = sha(text);
+    e.deposit_hash = depositHash({
+      kind: 'session-log', content_hash: e.content_hash, parents: [],
+      creator: creatorRef, derivation: 'original', provenance: prov,
+    });
   }
 
   edit({ name, text, baseV }) {
@@ -137,10 +260,11 @@ export class Store {
     if (newToks.join('') === textOf(head.segs)) throw new StoreError('no_change', 'Nothing changed.');
     const who = this.canon.get(nameKey(who0)) ?? who0, v = head.v + 1;
     const { objs, hunks } = attribute(objsOf(head.segs), newToks.map((t) => ({ t, a: who, v })));
-    const entry = { v, ts: new Date().toISOString(), name: who, kind: 'edit', base_v: baseV, segs: segsOf(objs), hunks };
-    if (merged) entry.merged = true;
-    entry.stats = this._stats(hunks);
-    return this._append(entry);
+    const e = { ts: new Date().toISOString(), name: who, kind: 'edit', base_v: baseV, segs: segsOf(objs), hunks };
+    if (merged) e.merged = true;
+    e.stats = this._stats(hunks);
+    this._stamp(e, textOf(e.segs), `name:${who}`, { origin: 'authored' });
+    return this._append(e);
   }
 
   revert(toV, note = 'admin') {
@@ -149,7 +273,88 @@ export class Store {
     if (textOf(target.segs) === textOf(head.segs) && JSON.stringify(target.segs) === JSON.stringify(head.segs))
       throw new StoreError('no_change', 'That is already the current version.');
     const { objs, hunks } = attribute(objsOf(head.segs), objsOf(target.segs), true);
-    return this._append({ v: head.v + 1, ts: new Date().toISOString(), name: note, kind: 'revert', base_v: head.v, restored_v: toV, segs: segsOf(objs), hunks, stats: this._stats(hunks) });
+    const e = { ts: new Date().toISOString(), name: note, kind: 'revert', base_v: head.v, restored_v: toV, segs: segsOf(objs), hunks, stats: this._stats(hunks) };
+    this._stamp(e, textOf(e.segs), `name:${note}`, { origin: 'authored' });
+    return this._append(e);
+  }
+
+  // Ingest path: a node's outgoing emit, arriving as a wire-shaped body. Fail-closed everywhere:
+  // op must be emit; the kind must pass the closed gate; the node key must be well-formed; content
+  // bounds apply before anything is stored; idempotence is keyed on the payload hash (canonicalized
+  // body), so a replay is acked with the original receipt and grows nothing.
+  ingest(body) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new StoreError('bad_json', 'A request is a JSON object.');
+    if (body.op !== 'emit') throw new StoreError('unknown_op', `op must be "emit", got ${JSON.stringify(body.op ?? null)}.`);
+    const payloadHash = sha(canonical(body));
+    const seen = this.receipts.get(payloadHash);
+    if (seen) return { ...seen, duplicate: true };
+    const nodeKey = typeof body.node_key === 'string' ? body.node_key.trim() : '';
+    if (!NODE_KEY_RE.test(nodeKey)) throw new StoreError('bad_node_key', 'node_key must look like key:<ref>, 3-64 chars, letters digits . _ -.');
+    const kind = mapKind(body.kind ?? null, body);
+    if (!kind) throw new StoreError('unknown_kind', `kind gate closed: accept {${GATE_KINDS.join(', ')}} (text/page map to session-log).`);
+    const derivation = body.derivation ?? 'original';
+    if (derivation !== 'original') throw new StoreError('consent_gate_unbuilt', 'fork/remix emit is refused on this node until the consent layer exists - fail closed.');
+    if (Array.isArray(body.parents) && body.parents.length) throw new StoreError('parents_on_original', 'an original has no parents; fork/remix is refused here (consent_gate_unbuilt).');
+    const origin = body.provenance?.origin ?? 'authored';
+    if (!ORIGIN_SET.has(origin)) throw new StoreError('bad_origin', 'provenance.origin must be one of authored|assisted|played.');
+    let text;
+    if (kind === 'node-key') {   // a node-key announce carries no content; text is not required here
+      const who = normName(body.provenance?.attributed_to?.name ?? '') || normName(body.node_key) || nodeKey;
+      if (!this.nodes.has(nodeKey)) this.nodes.set(nodeKey, { first_seen: new Date().toISOString(), seen: 0 });
+      const rec = this.nodes.get(nodeKey); rec.seen++; rec.who = who;
+      const receipt = { status: 'deposited', kind, receipt: 'rcpt:' + sha(payloadHash).slice(7, 23), id: body.id ?? null, payload_hash: payloadHash, node_key: nodeKey, ts: new Date().toISOString(), duplicate: false };
+      this.receipts.set(payloadHash, receipt);
+      this._persistReceipt(receipt);
+      if (this.file) fs.appendFileSync(path.join(this._dir(), 'nodes.jsonl'), JSON.stringify({ node_key: nodeKey, who, first_seen: rec.first_seen, seen: rec.seen, ts: receipt.ts }) + '\n');
+      return receipt;
+    }
+
+    if (body.content_b64 != null) {
+      if (typeof body.content_b64 !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(body.content_b64))
+        throw new StoreError('bad_content', 'content_b64 is not valid base64.');
+      text = cleanText(Buffer.from(body.content_b64, 'base64').toString('utf8'));
+    } else if (body.text != null) text = cleanText(body.text);
+    else throw new StoreError('bad_request', 'need text or content_b64.');
+    if (!text.trim()) throw new StoreError('empty', 'The text cannot be empty.');
+    if (text.length > MAX_TEXT) throw new StoreError('too_long', `Keep it under ${MAX_TEXT} characters.`);
+    const preHash = sha(text);
+    const prior = this.contentIndex.get(preHash);
+    if (prior && prior !== nodeKey) throw new StoreError('already_deposited', 'these bytes are already deposited by another key; identity squatting does not take the work.');
+    const v0 = this.entries.length + 1;
+    const segs = [[text, nodeKey, v0]];
+    const e = {
+      ts: new Date().toISOString(), name: nodeKey, kind: 'ingest', ingested_from: nodeKey,
+      base_v: this.head?.v ?? 0, segs, hunks: [], payload_hash: payloadHash,
+      provenance: { origin: 'ingested', declared_origin: origin, via: 'ingest' },
+    };
+    this._stamp(e, text, nodeKey, { origin: 'ingested', declared_origin: origin });
+    this._append(e);
+    const receipt = { status: 'deposited', kind, receipt: 'rcpt:' + sha(payloadHash).slice(7, 23), id: body.id ?? null, payload_hash: payloadHash, content_hash: e.content_hash, deposit_hash: e.deposit_hash, v: e.v, ts: e.ts, duplicate: false };
+    this.receipts.set(payloadHash, receipt);
+    this._persistReceipt(receipt);
+    this.contentIndex.set(preHash, nodeKey);
+    return receipt;
+  }
+
+  _loadReceipts() {
+    for (const e of this.entries) if (e.kind === 'ingest' && e.payload_hash && !this.receipts.has(e.payload_hash)) this.receipts.set(e.payload_hash, { status: 'deposited', kind: 'session-log', receipt: 'rcpt:' + sha(e.payload_hash).slice(7, 23), payload_hash: e.payload_hash, content_hash: e.content_hash, v: e.v, ts: e.ts, duplicate: false });
+    if (!this.file) return;
+    const f = path.join(this._dir(), 'receipts.jsonl');   // authoritative receipts: replays ack the ORIGINAL receipt, byte-identical, across restarts
+    if (!fs.existsSync(f)) return;
+    for (const line of fs.readFileSync(f, 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      try { const r = JSON.parse(line); if (r.payload_hash) this.receipts.set(r.payload_hash, { ...r, duplicate: false }); } catch { /* skip bad receipt lines */ }
+    }
+  }
+  _persistReceipt(r) { if (this.file) fs.appendFileSync(path.join(this._dir(), 'receipts.jsonl'), JSON.stringify(r) + '\n'); }
+  _loadNodes() {
+    if (!this.file) return;
+    const f = path.join(this._dir(), 'nodes.jsonl');
+    if (!fs.existsSync(f)) return;
+    for (const line of fs.readFileSync(f, 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      try { const r = JSON.parse(line); this.nodes.set(r.node_key, { first_seen: r.first_seen, seen: r.seen, who: r.who }); } catch { /* skip bad registry lines */ }
+    }
   }
 
   _stats(hunks) {
@@ -164,26 +369,29 @@ export class Store {
       return seen.get(k);
     };
     for (const e of this.entries) {
-      if (e.kind === 'revert') continue;
+      if (!PAGE_KINDS.has(e.kind)) continue;
       const a = touch(e.name); if (e.kind === 'edit') a.edits++;
       a.first ??= e.ts; a.last = e.ts;
     }
-    if (!this.empty) for (const [t, who] of this.head.segs) { if (who) touch(who).words += tokenize(t).filter(isWord).length; }
+    if (!this.empty) for (const [t, who] of this.head.segs) { if (who && !String(who).startsWith('key:')) touch(who).words += tokenize(t).filter(isWord).length; }
     return order;
   }
 
   state() {
     const h = this.head;
-    return { v: h.v, ts: h.ts, name: h.name, kind: h.kind, segs: h.segs, authors: this.authors() };
+    const s = { v: h.v, ts: h.ts, name: h.name, kind: h.kind, segs: h.segs, authors: this.authors() };
+    if (!this.integrity.ok) s.integrity = { ok: false, suspect: true, tampered: this.integrity.tampered, corrupt_lines: this.integrity.corrupt.length };
+    return s;
   }
 
-  versions() { return this.entries.map((e) => ({ v: e.v, ts: e.ts, name: e.name, kind: e.kind, restored_v: e.restored_v, stats: e.stats })).reverse(); }
+  versions() { return this.entries.filter((e) => PAGE_KINDS.has(e.kind)).map((e) => ({ v: e.v, ts: e.ts, name: e.name, kind: e.kind, restored_v: e.restored_v, stats: e.stats })).reverse(); }
 
   lineage(key) {
     const authors = this.authors(), who = authors.find((a) => a.key === key);
     if (!who) return null;
     const edits = [], lost = [];
     for (const e of this.entries) {
+      if (!PAGE_KINDS.has(e.kind)) continue;
       if (e.kind === 'edit' && nameKey(e.name) === key) edits.push({ v: e.v, ts: e.ts, hunks: e.hunks });
       if (e.kind !== 'seed' && !(e.kind === 'edit' && nameKey(e.name) === key)) {
         for (const h of e.hunks) {
@@ -195,24 +403,42 @@ export class Store {
     return { author: who, segs: this.head.segs, edits, lost };
   }
 
-  // A log shaped after the fields of seams-wire/0.1-draft `emit`. Not valid wire v0 (see note).
+  // A log shaped after the fields of seams-wire/0.3-draft `emit`, with the build-leg fixes:
+  // kind vocabulary enforced (session-log; "text" is not a wire kind), NO self-fork parents
+  // (a version chain is not a derivation - parents are [] and the chain lives in `chain`),
+  // content_hash/deposit_hash computed once at append and persisted (verified at load - a
+  // tampered log fails closed, it is never silently re-hashed), and ingest provenance on
+  // entries that arrived through the ingest gate.
   export() {
+    if (!this.integrity.ok)
+      throw new StoreError('log_integrity', 'This log failed its integrity check; export refuses to serve until an operator reviews the quarantine.',
+        { tampered: this.integrity.tampered, corrupt_lines: this.integrity.corrupt.length, anchor_ok: this.integrity.anchorOk });
     let prev = null;
     const entries = this.entries.map((e) => {
-      const text = textOf(e.segs), hash = sha(text), out = {
-        op: 'emit', kind: 'text', v: e.v, ts: e.ts, content_hash: hash, parents: prev ? [prev] : [],
-        derivation: prev ? 'fork' : 'original',
-        creator_ref: `name:${e.name}`, creator_verified: false,
-        provenance: { origin: 'authored', entry_kind: e.kind, base_version: e.base_v, ...(e.merged && { merged: true }), ...(e.restored_v && { restored_version: e.restored_v }) },
-        contributions: e.hunks.map((h) => ({ removed: h.rm.map(([t, a, v]) => ({ text: t, author: a, version: v })), added: h.add.map(([t, a, v]) => ({ text: t, author: a, version: v })) })),
+      const text = textOf(e.segs);
+      const isKey = String(e.name).startsWith('key:');
+      const ingested = e.kind === 'ingest';
+      const out = {
+        op: 'emit', kind: 'session-log', v: e.v, ts: e.ts, content_hash: e.content_hash,
+        deposit_hash: e.deposit_hash, parents: [], derivation: 'original',
+        creator_ref: isKey ? e.name : `name:${e.name}`, creator_verified: false,
+        provenance: { origin: ingested ? 'ingested' : 'authored', entry_kind: e.kind, base_version: e.base_v,
+          ...(e.provenance?.declared_origin && { declared_origin: e.provenance.declared_origin }),
+          ...(e.merged && { merged: true }), ...(e.restored_v && { restored_version: e.restored_v }),
+          ...(ingested && { via: 'ingest', payload_hash: e.payload_hash }) },
+        contributions: (e.hunks || []).map((h) => ({ removed: h.rm.map(([t, a, v]) => ({ text: t, author: a, version: v })), added: h.add.map(([t, a, v]) => ({ text: t, author: a, version: v })) })),
         attribution: e.segs.map(([t, a, v]) => ({ text: t, author: a, version: v })),
         text,
+        chain: e.chain ? { n: e.chain.n, hash: e.chain.hash, prev: e.chain.prev } : null,
       };
-      prev = hash; return out;
+      prev = e.chain?.hash ?? null; return out;
     });
     return {
-      format: 'seams-attribution-log/0-demo',
-      note: 'Shaped after the fields of seams-wire/0.1-draft emit (kind, parents, derivation, creator_ref, provenance, use_terms). NOT valid wire v0: no keys or signatures, creator names are typed and unverified, hashes are sha256 of the UTF-8 text rather than the Seams deposit hash, and "text" is not in the wire kind vocabulary. Authorship is inferred by word diff against the previous version.',
+      format: 'seams-attribution-log/0-eom.1',
+      wire: WIRE_VERSION,
+      note: 'Shaped after the fields of seams-wire/0.3-draft emit (kind, parents, derivation, creator_ref, provenance, use_terms), with the build-leg wire-semantics fixes: kind vocabulary enforced (entries are session-log; text/page payloads were mapped at the closed gate, no new wire kind), a version chain is NOT a derivation (parents stay [] and the log chain is carried separately in `chain`), content_hash/deposit_hash are computed once at append time and verified at load - a tampered log makes export refuse, it never silently re-hashes. Hashes remain opaque placeholders until the deposits-spec ruling lands; signing and keys are not in this demo (creator_verified is always false).',
+      integrity: { ok: true, tampered: [], corrupt_lines: this.integrity.corrupt.length, anchor_ok: this.integrity.anchorOk, legacy_bootstrap: this.integrity.legacy },
+      nodes: [...this.nodes.entries()].map(([node_key, r]) => ({ node_key, who: r.who ?? null, first_seen: r.first_seen, seen: r.seen })),
       use_terms: { allowed_uses: ['view', 'fork', 'remix'], compensation: 'none', note: 'Anyone may change this; your name stays on your words.' },
       entries,
     };
