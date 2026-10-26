@@ -5,15 +5,21 @@
 //   3. hello pins the wire - a skew refuses, rails-before-emit holds are launcher-side;
 //   4. the agent queue writes the correct markdown (append, never renumber, readback-confirmed);
 //   5. asserted-vs-verified labels are structural (reply-watcher output can never come back verified).
-// Plus an end-to-end against the REAL eom/node-one server, spawned ephemerally, driven through the
-// launcher's same-origin proxy, killed, and verified gone (ps + refused connections). No mocks on
-// that path: opaque hashes and refusal words must survive the proxy byte-for-byte.
+// Plus an end-to-end against the REAL eom/node-one server (spawned ephemerally, driven through the
+// launcher's same-origin proxy, killed, ps-verified gone - no mocks), and the app-launch pass:
+// the PWA shell (manifest parses/standalone/icons real; SW caches the static shell ONLY - /api,
+// /ops, /agent, /health are never intercepted), icon determinism, and launch.mjs (ONE command:
+// spawns+supervises both servers, ctrl-c reaps both ps-verified, a busy port is REUSE with a
+// clear message and no EADDRINUSE stack trace). Fifteen tests; every server the suite starts is
+// killed and ps-verified gone.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import {
   WIRE_PIN, FORMAT_PIN, GATE_EXPECT, NODE_YAML_DEFAULT,
@@ -24,7 +30,10 @@ import {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const LAUNCHER = path.join(here, '..', 'server.mjs');
+const LAUNCH = path.join(here, '..', 'launch.mjs');
 const NODE_ONE = path.join(here, '..', '..', 'node-one', 'attributed-text', 'server.mjs');
+const ICON_SCRIPT = path.join(here, '..', 'scripts', 'make-icons.mjs');
+const ICONS_DIR = path.join(here, '..', 'public', 'icons');
 const tmp = (p) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 
 function serve(entry, env) {
@@ -251,7 +260,194 @@ test('e2e: launcher proxy drives eom/node-one - hello, announce, emit, replay, r
   }
 });
 
-// ---------------- 7. must-never surface scan on what ships to the browser ----------------
+// ---------------- 8. installable app shell: manifest + service-worker doctrine ----------------
+function spawnCollect(entry, env) {
+  const proc = spawn(process.execPath, [entry], { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let out = '';
+  proc.stdout.on('data', (c) => { out += c; });
+  proc.stderr.on('data', (c) => { out += c; });
+  return { proc, out: () => out };
+}
+const waitForExit = (proc, ms = 9000) => new Promise((resolve, reject) => {
+  const to = setTimeout(() => reject(new Error('still running')), ms);
+  proc.once('exit', (c) => { clearTimeout(to); resolve(c); });
+});
+const pngRaw = (buf) => {
+  assert.deepEqual([...buf.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 'PNG signature');
+  assert.equal(buf.toString('ascii', 12, 16), 'IHDR');
+  assert.equal(buf[24], 8, '8-bit'); assert.equal(buf[25], 6, 'RGBA');
+  const idat = [];
+  let off = 8;
+  while (off < buf.length) { const len = buf.readUInt32BE(off); const type = buf.toString('ascii', off + 4, off + 8); if (type === 'IDAT') idat.push(buf.subarray(off + 8, off + 8 + len)); off += 12 + len; }
+  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20), pixels: zlib.inflateSync(Buffer.concat(idat)).toString('base64') };
+};
+
+test('PWA shell: manifest parses, standalone, real served icons; CSP opens manifest-src and nothing else', async () => {
+  const s = serve(LAUNCHER, { PORT: '0', OPS_DIR: tmp('seams-ops-'), NODE_ONE_URL: 'http://127.0.0.1:1' });
+  try {
+    const base = await s.url;
+    const m = await fetch(base + '/manifest.webmanifest');
+    assert.equal(m.status, 200);
+    assert.match(m.headers.get('content-type'), /application\/manifest\+json/);
+    assert.equal(m.headers.get('cache-control'), 'no-store', 'the server never answers the shell stale; the SW is network-first anyway');
+    const man = JSON.parse(await m.text());
+    assert.equal(man.name, 'Seams Launcher');
+    assert.equal(man.display, 'standalone', 'installs as an app window, not a tab');
+    assert.equal(man.start_url, '/'); assert.equal(man.scope, '/');
+    assert.match(man.theme_color, /^#[0-9a-f]{6}$/i); assert.match(man.background_color, /^#[0-9a-f]{6}$/i);
+    assert.ok(Array.isArray(man.icons) && man.icons.length >= 3, 'icon set present');
+    const sizes = man.icons.map((i) => i.sizes);
+    assert.ok(sizes.includes('192x192') && sizes.includes('512x512'), 'install-grade icon sizes');
+    for (const ic of man.icons) {
+      assert.match(ic.src, /^\/icons\/[a-z0-9-]+\.png$/, 'icons are local loopback-served files');
+      const r = await fetch(base + ic.src);
+      assert.equal(r.status, 200, ic.src + ' resolves');
+      assert.match(r.headers.get('content-type'), /image\/png/);
+    }
+    const idx = (await jfetch(base + '/')).raw;
+    assert.match(idx, /rel="manifest" href="\/manifest\.webmanifest"/, 'the window declares the manifest');
+    assert.match(idx, /apple-mobile-web-app-capable/, 'Safari Add-to-Dock opens a standalone window');
+    assert.match(idx, /apple-touch-icon/);
+    assert.match(idx, /name="theme-color"/);
+    assert.match((await fetch(base + '/')).headers.get('content-security-policy'), /manifest-src 'self'/, 'manifest fetch allowed - nothing else opens');
+  } finally { await killed(s.proc); }
+});
+
+test('SW doctrine: app-shell cache ONLY - /api, /ops, /agent, /health are never intercepted, cached, or replayed', async () => {
+  const s = serve(LAUNCHER, { PORT: '0', OPS_DIR: tmp('seams-ops-'), NODE_ONE_URL: 'http://127.0.0.1:1' });
+  try {
+    const base = await s.url;
+    const swRes = await fetch(base + '/sw.js');
+    assert.equal(swRes.status, 200);
+    assert.match(swRes.headers.get('content-type'), /text\/javascript/);
+    const sw = await swRes.text();
+    assert.match(sw, /network-first/, 'fresh bytes when online; the cache answers offline only - no stale receipts');
+    assert.match(sw, /method !== 'GET'\) return/, 'every write is the network\'s, always');
+    assert.match(sw, /DYNAMIC\(u\)\) return/, 'dynamic traffic: the SW steps aside entirely');
+    assert.match(sw, /DYNAMIC[\s\S]*?'\/api'[\s\S]*?'\/api\/'[\s\S]*?'\/ops\/'[\s\S]*?'\/agent\/'[\s\S]*?'\/health'/, 'the step-aside list names /api, /ops, /agent, /health');
+    assert.match(sw, /u\.origin !== self\.location\.origin/, 'cross-origin left on the network untouched');
+    const listM = sw.match(/const ASSETS = \[([\s\S]*?)\];/);
+    assert.ok(listM, 'one named static cacheable list');
+    const assets = [...listM[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+    assert.ok(assets.length >= 6, 'static asset list sane (' + assets.length + ' entries)');
+    for (const a of assets) {
+      assert.doesNotMatch(a, /^\/(api|ops|agent|health)(\/|$)/, 'no dynamic path may EVER be cacheable: ' + a);
+      const r = await fetch(base + a);
+      assert.equal(r.status, 200, 'the cacheable list is honest - every entry serves: ' + a);
+    }
+    assert.match(sw, /net\.ok && ASSETS\.includes\(u\.pathname\)/, 'cache writes only for allow-listed static');
+    assert.doesNotMatch(sw, /caches\.add\(|addAll/, 'no bulk pre-cache: nothing sneaks in behind the list');
+    assert.equal((sw.match(/caches\.open\(CACHE\)/g) || []).length, 1, 'exactly one cache target');
+    assert.equal((sw.match(/\.put\(/g) || []).length, 1, 'exactly one write site, behind the guard');
+  } finally { await killed(s.proc); }
+});
+
+test('icons: valid PNGs at advertised sizes, rebuilding pixel-identical from the repo script (into temp, repo untouched)', async () => {
+  const committed = {};
+  for (const [f, size] of [['icon-192.png', 192], ['icon-512.png', 512], ['apple-touch-icon.png', 180]]) {
+    const buf = fs.readFileSync(path.join(ICONS_DIR, f));
+    assert.ok(buf.length > 512 && buf.length < 250 * 1024, f + ' sane file size');
+    committed[f] = pngRaw(buf);
+    assert.equal(committed[f].w, size, f + ' width'); assert.equal(committed[f].h, size, f + ' height');
+  }
+  const outDir = tmp('seams-icons-');
+  const gen = spawnCollect(ICON_SCRIPT, { ICONS_OUT: outDir });
+  assert.equal(await waitForExit(gen.proc, 15000), 0, 'icon script runs clean: ' + gen.out());
+  for (const f of Object.keys(committed)) {
+    assert.deepEqual(pngRaw(fs.readFileSync(path.join(outDir, f))), committed[f], f + ' rebuilds pixel-identical - the MANIFEST can pin it honestly');
+  }
+});
+
+// ---------------- 9. the one command: launch.mjs spawns, supervises, reaps ----------------
+const portTaken = (port) => new Promise((resolve) => {
+  const s = net.connect({ host: '127.0.0.1', port });
+  const done = (v) => { s.destroy(); resolve(v); };
+  s.setTimeout(500, () => done(false));
+  s.once('connect', () => done(true));
+  s.once('error', () => done(false));
+});
+async function freePorts(n) {
+  const got = [];
+  for (let i = 0; i < n; i++) {
+    const s = net.createServer();
+    await new Promise((r) => s.listen(0, '127.0.0.1', r));
+    got.push(s.address().port);
+    await new Promise((r) => s.close(r));
+  }
+  return got;
+}
+async function waitLine(s, re, ms = 12000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (re.test(s.out())) return s.out();
+    if (s.proc.exitCode !== null) throw new Error(`exited ${s.proc.exitCode} before /${re}/:\n${s.out()}`);
+    await new Promise((r) => setTimeout(r, 60));
+  }
+  throw new Error(`timeout waiting for /${re}/:\n${s.out()}`);
+}
+const psGone = (pid) => new Promise((resolve) => {
+  const ps = spawn('ps', ['-p', String(pid)], { stdio: ['ignore', 'pipe', 'ignore'] });
+  let o = ''; ps.stdout.on('data', (c) => { o += c; });
+  ps.on('exit', () => resolve(!/\bnode\b/.test(o.replace(/^\s*PID[^\n]*\n/, ''))));
+});
+
+test('launch.mjs: ONE command boots both servers (hello through the supervised proxy); ctrl-c reaps both, ps-verified', async () => {
+  const [pL, pN] = await freePorts(2);
+  const s = spawnCollect(LAUNCH, { PORT: String(pL), NODE_ONE_PORT: String(pN), OPS_DIR: tmp('seams-ops-'), NODE_ONE_DATA_DIR: tmp('seams-n1-') });
+  try {
+    await waitLine(s, /Seams Launcher is up/);
+    const mN = s.out().match(/spawned node-one pid=(\d+)/);
+    const mL = s.out().match(/spawned launcher pid=(\d+)/);
+    assert.ok(mN && mL, 'both children spawned and logged:\n' + s.out().slice(0, 600));
+    const [pidN, pidL] = [Number(mN[1]), Number(mL[1])];
+    const health = await jfetch(`http://127.0.0.1:${pL}/health`);
+    assert.equal(health.body.posture, 'local-only');
+    const hello = await jfetch(`http://127.0.0.1:${pL}/api/hello`);
+    assert.equal(hello.body.wire, WIRE_PIN, 'the supervised node-one answers through the supervised launcher');
+    s.proc.kill('SIGINT');
+    assert.equal(await waitForExit(s.proc), 0, 'ctrl-c exits clean');
+    assert.equal((s.out().match(/reaped \(ps-verified gone\)/g) || []).length, 2, 'supervisor ps-verified both children');
+    assert.ok(await psGone(pidN), 'node-one child really gone (independent ps)');
+    assert.ok(await psGone(pidL), 'launcher child really gone (independent ps)');
+    assert.equal(await portTaken(pL), false, 'launcher port released');
+    assert.equal(await portTaken(pN), false, 'node-one port released');
+  } finally {
+    if (s.proc.exitCode === null) { s.proc.kill('SIGKILL'); await waitForExit(s.proc, 5000).catch(() => {}); }
+  }
+});
+
+test('port hygiene: second launch REUSES with a clear message - no EADDRINUSE, no stack trace; bare re-runs of both servers exit 0 too', async () => {
+  const [pL, pN] = await freePorts(2);
+  const env = { PORT: String(pL), NODE_ONE_PORT: String(pN), OPS_DIR: tmp('seams-ops-'), NODE_ONE_DATA_DIR: tmp('seams-n1-') };
+  const first = spawnCollect(LAUNCH, env);
+  await waitLine(first, /Seams Launcher is up/);
+  try {
+    const two = spawnCollect(LAUNCH, { ...env, OPS_DIR: tmp('seams-ops2-') });
+    assert.equal(await waitForExit(two.proc), 0, 'second launch exits 0 - reuse, not crash');
+    const out2 = two.out();
+    assert.match(out2, /already running/, 'says already running');
+    assert.match(out2, new RegExp('open http:\\/\\/127\\.0\\.0\\.1:' + pL), 'hands over the open-the-URL line');
+    assert.match(out2, /everything already running/, 'both ports busy -> nothing to supervise');
+    assert.doesNotMatch(out2, /spawned \S+ pid=/, 'the reuse path spawns nothing');
+    assert.doesNotMatch(out2, /EADDRINUSE/, 'no EADDRINUSE anywhere');
+    assert.doesNotMatch(out2, /^\s+at\s+\S+\s+\(/m, 'no stack frames');
+    assert.equal((await jfetch(`http://127.0.0.1:${pL}/health`)).status, 200, 'the running launcher is untouched by the second attempt');
+    // and the bare `node server.mjs` re-runs that bit Erah today - the servers answer busy ports themselves now
+    const dupL = spawnCollect(LAUNCHER, { PORT: String(pL), OPS_DIR: tmp('seams-ops-'), NODE_ONE_URL: `http://127.0.0.1:${pN}` });
+    assert.equal(await waitForExit(dupL.proc), 0, 'launcher server.mjs on a busy port exits 0');
+    assert.match(dupL.out(), /already running on 127\.0\.0\.1:\d+ - open http:\/\/127\.0\.0\.1:/);
+    assert.doesNotMatch(dupL.out(), /EADDRINUSE/);
+    const dupN = spawnCollect(NODE_ONE, { PORT: String(pN), DATA_DIR: tmp('seams-n1-') });
+    assert.equal(await waitForExit(dupN.proc), 0, 'node-one on a busy port exits 0');
+    assert.match(dupN.out(), /node-one already running on http:\/\/127\.0\.0\.1:\d+ - reusing/);
+    assert.doesNotMatch(dupN.out(), /EADDRINUSE|at .*\.mjs:\d+:/);
+  } finally {
+    first.proc.kill('SIGINT');
+    await waitForExit(first.proc, 5000).catch(() => { first.proc.kill('SIGKILL'); });
+  }
+});
+
+// ---------------- 10. must-never surface scan on what ships to the browser ----------------
 test('must-nevers hold in the shipped surface: no payments, no vouches, no verified:true display, no tunnel UI', async () => {
   const s = serve(LAUNCHER, { PORT: '0', OPS_DIR: tmp('seams-ops-'), NODE_ONE_URL: 'http://127.0.0.1:1' });
   try {
