@@ -1,0 +1,57 @@
+:root {
+  --bg: #faf8f4; --fg: #1f1d1a; --muted: #77716a; --line: #e3ded6; --accent: #2d2a26; --panel: #f1ede6;
+  --l: 86%; --s: 75%;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #161513; --fg: #ebe7e0; --muted: #9a948b; --line: #2e2b27; --accent: #ebe7e0; --panel: #201e1b; --l: 30%; --s: 45%; }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 1.2rem/1.75 Georgia, "Iowan Old Style", "Times New Roman", serif; }
+#app { max-width: 38rem; margin: 0 auto; padding: 2.5rem 1.25rem calc(3rem + env(safe-area-inset-bottom)); min-height: 100vh; }
+.ui { font: 0.95rem/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 2rem; }
+.meta, .foot { color: var(--muted); font-size: 0.82rem; }
+.foot { margin-top: 2.5rem; }
+.meta { margin: 0 0 1rem; }
+.bar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 1rem; }
+button, .btn { font: inherit; font-size: 0.92rem; color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 0.5rem 1rem; min-height: 2.5rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+button:hover, .btn:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+button[aria-pressed="true"] { background: var(--panel); border-color: var(--muted); }
+button:disabled { opacity: 0.5; }
+a { color: inherit; text-underline-offset: 3px; }
+h2 { font: 600 1.05rem/1.3 system-ui, sans-serif; margin: 1.6rem 0 0.6rem; }
+.back { display: inline-block; margin-bottom: 1.2rem; color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+
+textarea, input { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 8px; width: 100%; padding: 0.7rem 0.8rem; }
+textarea { min-height: 45vh; line-height: 1.7; resize: vertical; white-space: pre-wrap; }
+input { font-size: 1rem; }
+label { display: block; margin: 1rem 0 0.3rem; color: var(--muted); font-size: 0.85rem; }
+textarea:focus, input:focus { outline: 2px solid var(--muted); outline-offset: 1px; }
+.notice { background: var(--panel); border-radius: 8px; padding: 0.7rem 0.9rem; margin: 1rem 0; font-size: 0.9rem; }
+.notice.err { border-left: 3px solid #c0392b; }
+
+/* authors: one hue each, soft tint behind the words */
+.seg { border-radius: 3px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.color .seg, .dot, .chip { background: hsl(var(--h) var(--s) var(--l)); }
+.color .seg { cursor: help; }
+.dim .seg:not(.hl) { opacity: 0.45; }
+.hl { background: hsl(var(--h) var(--s) var(--l)); }
+.a0 { --h: 210; } .a1 { --h: 38; } .a2 { --h: 330; } .a3 { --h: 150; } .a4 { --h: 268; }
+.a5 { --h: 12; } .a6 { --h: 182; } .a7 { --h: 62; } .a8 { --h: 300; } .a9 { --h: 100; }
+.alt .seg, .alt.chip { text-decoration: underline dotted; text-underline-offset: 4px; }
+.who { position: fixed; left: 50%; transform: translateX(-50%); width: calc(100% - 2.5rem); bottom: 0.75rem; box-shadow: 0 2px 12px rgba(0,0,0,.15); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.55rem 0.8rem; font-size: 0.85rem; max-width: 30rem; text-align: center; }
+.who[hidden] { display: none; }
+
+.dot { display: inline-block; width: 0.9rem; height: 0.9rem; border-radius: 50%; border: 1px solid var(--muted); flex: none; }
+.list { list-style: none; padding: 0; margin: 0; }
+.list li > a, .list li > button { display: flex; gap: 0.7rem; align-items: center; width: 100%; padding: 0.8rem 0.2rem; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; text-align: left; text-decoration: none; min-height: 3rem; }
+.list .sub { margin-left: auto; color: var(--muted); font-size: 0.82rem; text-align: right; }
+.change { border-bottom: 1px solid var(--line); padding: 0.8rem 0; font-size: 1.02rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.change .when { display: block; color: var(--muted); font-size: 0.78rem; margin-bottom: 0.2rem; }
+.chip { border-radius: 3px; }
+.rm { text-decoration: line-through; text-decoration-color: var(--muted); opacity: 0.85; }
+.arrow { color: var(--muted); padding: 0 0.3rem; }
+.banner { background: var(--panel); border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 1.2rem; font-size: 0.88rem; }
