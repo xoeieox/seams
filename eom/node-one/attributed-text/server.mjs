@@ -163,3 +163,13 @@ server.listen(PORT, HOST, function () {
   // T1 fix: the token is never printed. Its location is; the value is read from the 0600 file by the operator.
   console.log(`admin token: ${path.join(DATA_DIR, 'admin-token.txt')} (mode 0600) - open /#/admin and paste it to enable "restore this version"`);
 });
+// Port hygiene (launcher-app pass 2026-10-26): a second start on a taken port means a node-one
+// is already running there - say so and exit clean, never a stack trace. (launch.mjs probes first; this is the race backstop.)
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    console.log(`node-one already running on http://${HOST}:${PORT} - reusing it (nothing new started; if that is not node-one, free the port or set PORT= and run again)`);
+    process.exit(0);
+  }
+  console.error(`node-one could not listen on ${HOST}:${PORT}: ${err && err.message ? err.message : err}`);
+  process.exit(1);
+});
