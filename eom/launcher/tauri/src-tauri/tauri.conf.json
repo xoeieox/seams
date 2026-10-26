@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Seams Launcher",
+  "version": "0.1.0",
+  "identifier": "app.seams.launcher",
+  "build": {
+    "devUrl": "http://127.0.0.1:4173",
+    "frontendDist": "../../public",
+    "beforeDevCommand": "node ../launch.mjs || node ../../launch.mjs || node ./launch.mjs || true"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": []
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app"],
+    "icon": ["icons/icon.png"]
+  }
+}

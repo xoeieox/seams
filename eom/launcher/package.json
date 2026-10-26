@@ -1,0 +1,17 @@
+{
+  "name": "seams-launcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Seams Launcher - one command, both servers, loopback only. The UI runtime is ZERO-dependency (plain HTML/CSS/JS served by server.mjs, booted by launch.mjs). The one dependency this project carries is the Tauri CLI in devDependencies: build tooling only, never imported at runtime. Commit package-lock.json once generated (Erah's machine) to freeze the exact CLI build.",
+  "license": "SEE LICENSE IN /LICENSE",
+  "scripts": {
+    "dev": "node launch.mjs",
+    "test": "node --test test/launcher.test.mjs",
+    "tauri": "cd tauri && npx @tauri-apps/cli dev",
+    "tauri:build": "cd tauri && npx @tauri-apps/cli build",
+    "tauri:icons": "cd tauri && npx @tauri-apps/cli icon src-tauri/icons/icon.png src-tauri/icons"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

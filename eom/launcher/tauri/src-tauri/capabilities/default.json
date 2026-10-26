@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capability for the main window. The window loads the loopback launcher server (127.0.0.1) and the page uses no Tauri IPC, so core:default is all it needs.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

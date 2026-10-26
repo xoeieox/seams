@@ -1,0 +1,14 @@
+# Cargo build output and Tauri codegen (Erah's machine builds; nothing here is tracked).
+/target/
+/gen/
+/Cargo.lock
+
+# Generated icon sets (icns/ico/windows tiles) stay local: regenerate with
+#   cd tauri && npx @tauri-apps/cli icon src-tauri/icons/icon.png src-tauri/icons
+# only the source flame (icons/icon.png) is committed.
+/icons/*.icns
+/icons/*.ico
+/icons/32x32.png
+/icons/128x128.png
+/icons/128x128@2x.png
+/icons/Square*
