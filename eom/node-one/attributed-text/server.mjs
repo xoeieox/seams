@@ -89,6 +89,7 @@ const STATUS = {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x'), p = url.pathname;
+  let emitRoute = false;   // REQ-EMIT-9: every emit-route response echoes wire - successes AND refusals (conformance suite, 2026-10-26)
   try {
     if (req.method === 'GET' && STATIC[p]) {
       const [file, type] = STATIC[p];
@@ -130,10 +131,11 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, ...wireEcho, state: store.state(), saved_v: e.v });
     }
     if (req.method === 'POST' && p === '/api/ingest') {
+      emitRoute = true;
       // The join gate. Closed set, fail-closed receipts, payload-hash idempotence (all in Store.ingest).
       const ip = 'ingest-ip:' + socketIp(req);
       const wait = peek(ip, INGEST_LIMIT) || peek('ingest-global', GLOBAL_LIMIT);
-      if (wait) return fail(res, 429, 'rate_limited', `Too many emits. Try again in ${Math.ceil(wait / 60)} min.`, {}, { 'retry-after': String(wait) });
+      if (wait) return fail(res, 429, 'rate_limited', `Too many emits. Try again in ${Math.ceil(wait / 60)} min.`, { ...wireEcho }, { 'retry-after': String(wait) });
       const b = await readJson(req);
       const receipt = store.ingest(b);                       // gate refusals throw => no rate burn
       if (receipt.status === 'deposited' && !receipt.duplicate) { charge(ip); charge('ingest-global'); }
@@ -151,7 +153,7 @@ const server = http.createServer(async (req, res) => {
     }
     fail(res, 404, 'not_found', 'Not found.');
   } catch (err) {
-    if (err instanceof StoreError) return fail(res, STATUS[err.code] || 400, err.code, err.message, err.extra);
+    if (err instanceof StoreError) return fail(res, STATUS[err.code] || 400, err.code, err.message, emitRoute ? { ...wireEcho, ...err.extra } : err.extra);
     console.error(err); fail(res, 500, 'server_error', 'Something went wrong.');
   }
 });
