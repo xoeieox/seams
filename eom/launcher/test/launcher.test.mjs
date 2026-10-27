@@ -27,6 +27,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import {
   WIRE_PIN, FORMAT_PIN, GATE_EXPECT, NODE_YAML_DEFAULT,
@@ -525,8 +526,9 @@ test('make-mac-bundle.sh: one command -> verified, self-describing tarball the M
   const tar = path.join(out, 'seams-launcher-mac-latest.tar.gz');
   const side = path.join(out, 'seams-launcher-mac-latest.tar.gz.sha256');
   assert.ok(fs.existsSync(tar) && fs.existsSync(side), 'tarball + sha256 sidecar land at stable paths');
-  execFileSync('sha256sum', ['-c', path.basename(side)], { cwd: out });
-  const listing = execFileSync('tar', ['-tzf', tar], { encoding: 'utf8' });
+  const wantHash = createHash('sha256').update(fs.readFileSync(tar)).digest('hex');
+  assert.ok(fs.readFileSync(side, 'utf8').startsWith(wantHash), 'sidecar sha256 matches the tarball bytes (node crypto: macOS ships shasum, not GNU sha256sum - Mac run #3 latent landmine, now gone)');
+  const listing = execFileSync('tar', ['-tf', tar], { encoding: 'utf8' });
   for (const req of ['seams-launcher/launch.mjs', 'seams-launcher/server.mjs', 'seams-launcher/public/index.html',
     'seams-launcher/tauri/src-tauri/src/lib.rs', 'seams-launcher/tauri/src-tauri/icons/icon.png',
     'seams-launcher/scripts/make-mac-bundle.sh',
@@ -539,6 +541,99 @@ test('make-mac-bundle.sh: one command -> verified, self-describing tarball the M
   fs.rmSync(out, { recursive: true, force: true });
 });
 
+// ---------------- 9a2. tar-flavor portability - Mac run #3 regression ----------------
+// Erah's Mac run #3 (bundle b1519cd6): npm test 18/21 - all 3 bundle tests died at ONE inner
+// command: bsdtar printed "tar: Option --sort=name is not supported" when the suite ran
+// make-mac-bundle.sh. Root cause: GNU-only create flags. The bundler now packs with node
+// builtins ONLY (strict POSIX ustar + gzip with the header clock zeroed): portable wherever
+// node runs - BRIX or Mac - and byte-deterministic by construction. These gates keep it that
+// way: (1) belt - no GNU-only create flag may ever return, no external tar/gzip/sha256sum, and
+// the suite's own tar calls stay in the bsdtar-safe -tf/-xf forms; (2) two fresh builds must be
+// BYTE-IDENTICAL (the sha256 sidecar doctrine rests on it) and the archive must parse under a
+// hand-written STRICT ustar reader - the exact subset bsdtar is guaranteed to accept - with no
+// external tar involved anywhere.
+const GNU_CREATE_FLAGS = ['--sort', '--format=gnu', '--owner=', '--group=', '--numeric-owner', '--mtime=', '--clamp-mtime', '--pax-option', '--pax-header'];
+
+test('portability: bundler carries NO GNU-only create flags and no GNU-coreutils deps (Mac run #3)', () => {
+  const code = fs.readFileSync(BUNDLE_SH, 'utf8').split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  for (const flag of GNU_CREATE_FLAGS) {
+    assert.ok(!code.includes(flag), 'GNU-only create flag returned to the bundler: ' + flag);
+  }
+  assert.doesNotMatch(code, /^\s*tar\b/m, 'create side runs NO external tar - the node packer owns the bytes (bsdtar lacks GNU flags entirely)');
+  assert.match(code, /zlib\.gzipSync/, 'packer rides node:zlib - portable wherever node runs');
+  assert.doesNotMatch(code, /(^|[^.\w])(sha256sum|gzip)\b/, 'no GNU-coreutils sha256sum / external gzip - macOS promises neither (shasum lives here)');
+  const testSrc = fs.readFileSync(path.join(here, 'launcher.test.mjs'), 'utf8').split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  const calls = [...testSrc.matchAll(/execFileSync\('tar',\s*\[([^\]]*)\]/g)];
+  assert.equal(calls.length, 2, 'suite exercises exactly list+unpack through the system tar');
+  for (const c of calls) {
+    assert.match(c[1], /^'-t[f]'|^'-x[f]'/, 'tar call must open with a bsdtar-safe -tf/-xf op: ' + c[1]);
+    assert.doesNotMatch(c[1], /tzf|xzf|--sort|--format/, 'no test-hostile tar args: ' + c[1]);
+  }
+});
+
+test('portability: two builds BYTE-IDENTICAL; archive parses as strict ustar (bsdtar subset, no external tar)', () => {
+  const dirs = [];
+  const build = () => {
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'seams-determ-'));
+    dirs.push(out);
+    execFileSync('bash', [BUNDLE_SH], { env: { ...process.env, SEAMS_BUNDLE_DIR: out, SEAMS_LAUNCHER_DIR: path.join(here, '..') } });
+    return fs.readFileSync(path.join(out, 'seams-launcher-mac-latest.tar.gz'));
+  };
+  try {
+    const a = build();
+    const b = build();
+    assert.equal(createHash('sha256').update(a).digest('hex'), createHash('sha256').update(b).digest('hex'),
+      'two fresh builds of the same tree -> IDENTICAL bytes - the sha sidecar doctrine rests on this');
+    assert.deepEqual([...a.subarray(4, 8)], [0, 0, 0, 0], 'gzip MTIME pinned to 0 - no build clock in the bytes');
+    assert.equal(a[9], 0xff, 'gzip OS byte = unknown (flavor-agnostic)');
+    const tb = zlib.gunzipSync(a);
+    assert.equal(tb.length % 512, 0, 'tar is a stream of 512-byte blocks');
+    const field = (blk, o, len) => {
+      const s = blk.subarray(o, o + len);
+      const z = s.indexOf(0);
+      return (z === -1 ? s : s.subarray(0, z)).toString('latin1').replace(/\s+$/, '');
+    };
+    const oct = (s) => { const t = s.replace(/^[0 ]+/, ''); return t === '' ? 0 : parseInt(t, 8); };
+    const members = new Map();
+    let pos = 0;
+    while (pos + 512 <= tb.length) {
+      const blk = tb.subarray(pos, pos + 512);
+      if (blk.every((x) => x === 0)) break;
+      let sum = 0;
+      for (let i = 0; i < 512; i++) sum += (i >= 148 && i < 156) ? 0x20 : blk[i];
+      assert.equal(sum, oct(field(blk, 148, 8)), 'ustar header checksum @' + pos + ' for ' + field(blk, 0, 100));
+      assert.equal(blk.subarray(257, 263).toString('latin1'), 'ustar\0', 'strict POSIX ustar magic - NOT gnu format (bsdtar reads this subset)');
+      assert.equal(blk.subarray(263, 265).toString('latin1'), '00', 'ustar version 00');
+      const tf = String.fromCharCode(blk[156]);
+      assert.ok(tf === '0' || tf === '5', 'plain files and dirs only, saw ' + JSON.stringify(tf) + ' @' + pos);
+      assert.equal(field(blk, 157, 100), '', 'no linkname - symlinks stay out of the bundle @' + pos);
+      assert.equal(oct(field(blk, 108, 8)), 0, 'uid pinned 0');
+      assert.equal(oct(field(blk, 116, 8)), 0, 'gid pinned 0');
+      assert.equal(field(blk, 265, 32), 'root', 'uname pinned');
+      assert.equal(field(blk, 297, 32), 'root', 'gname pinned');
+      assert.equal(oct(field(blk, 136, 12)), 0, 'mtime pinned 0');
+      const mode = oct(field(blk, 100, 8));
+      assert.ok(tf === '5' ? mode === 0o755 : (mode === 0o644 || mode === 0o755), 'modes normalized, saw ' + mode.toString(8) + ' for ' + field(blk, 0, 100));
+      members.set(field(blk, 0, 100).replace(/\/$/, ''), { tf, mode });
+      pos += 512 + 512 * Math.ceil(oct(field(blk, 124, 12)) / 512);
+    }
+    for (const req of ['seams-launcher/launch.mjs', 'seams-launcher/server.mjs', 'seams-launcher/node-one/attributed-text/server.mjs',
+      'seams-launcher/node-one/attributed-text/seed.json', 'seams-launcher/tauri/src-tauri/tauri.conf.json',
+      'seams-launcher/scripts/make-mac-bundle.sh']) {
+      assert.ok(members.has(req), 'strict ustar walk carries ' + req);
+    }
+    for (const nm of members.keys()) {
+      assert.ok(!/(^|\/)(target|node_modules|ops|data|\.git)(\/|$)/.test(nm), 'junk must stay home: ' + nm);
+      assert.ok(!nm.endsWith('.DS_Store') && !nm.includes('._'), 'AppleDouble junk must stay home: ' + nm);
+    }
+    const execBit = (m) => (m & 0o111) !== 0;
+    assert.equal(execBit(members.get('seams-launcher/scripts/make-mac-bundle.sh').mode), execBit(fs.statSync(BUNDLE_SH).mode),
+      'the exec bit travels with the packer');
+  } finally {
+    for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
+  }
+});
+
 // ---------------- 9b. bundle layout (flat tree) e2e - Mac run #1 regression ----------------
 // Runs the EXACT beforeDevCommand sequence (`node ../launch.mjs --dev`) with cwd=<tmp>/tauri
 // against a freshly built, unpacked bundle. Asserts both ports accept AFTER the launcher
@@ -547,7 +642,7 @@ test('make-mac-bundle.sh: one command -> verified, self-describing tarball the M
 function unpackBundle() {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'seams-unpack-'));
   execFileSync('bash', [BUNDLE_SH], { env: { ...process.env, SEAMS_BUNDLE_DIR: out, SEAMS_LAUNCHER_DIR: path.join(here, '..') } });
-  execFileSync('tar', ['-xzf', path.join(out, 'seams-launcher-mac-latest.tar.gz'), '-C', out]);
+  execFileSync('tar', ['-xf', path.join(out, 'seams-launcher-mac-latest.tar.gz'), '-C', out]);
   return { out, root: path.join(out, 'seams-launcher') };
 }
 
