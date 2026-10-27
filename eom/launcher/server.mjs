@@ -17,6 +17,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import {
   WIRE_PIN, NODE_YAML_DEFAULT, renderDeclarations, appendPacket, parseReplies, parseQueueTasks,
+  composeBrief, lintPointers,
 } from './launcher-core.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -140,17 +141,43 @@ const server = http.createServer(async (req, res) => {
       let b; try { b = JSON.parse((await readBody(req)) || '{}'); } catch { return fail(res, 400, 'bad_json', 'Bad request.'); }
       const items = Array.isArray(b.items) ? b.items.slice(0, 50) : [];
       const clean = items
-        .map((it) => ({ title: cleanStr(it.title, 120), evidence: cleanStr(it.evidence, 400), source: cleanStr(it.source, 40) }))
+        .map((it) => ({
+          title: cleanStr(it.title, 120), evidence: cleanStr(it.evidence, 400), source: cleanStr(it.source, 40),
+          brief: it.brief && typeof it.brief === 'object' ? {
+            goal: cleanStr(it.brief.goal, 200),
+            accept: cleanStr(it.brief.accept, 300),
+            pointers: Array.isArray(it.brief.pointers) ? it.brief.pointers.slice(0, 8).map((p2) => cleanStr(p2, 200)).filter(Boolean) : null,
+          } : null,
+        }))
         .filter((it) => it.title);
       if (!clean.length) return fail(res, 400, 'empty_queue', 'Nothing to write: no queue items.');
       const goal = cleanStr(b.goal, 200);
+      // Self-contained hand-off briefs (Mac run #4): every open entry carries a brief. The human's
+      // typed goal wins; otherwise the launcher COMPOSES one from queue-time tab context
+      // (source + title + evidence), pointing at packet docs the agent can read for itself.
+      // No goal AND nothing to compose from = readable refusal: the outbox takes no silent
+      // open tasks. Every pointer is linted against the packet on disk - bundle-first,
+      // repo-sibling fallback (the launch.mjs layout doctrine). One bad field refuses the whole
+      // write; nothing partial ever lands.
+      const built = [];
+      for (const it of clean) {
+        const br = composeBrief(it, goal);
+        if (!br) return fail(res, 400, 'unbriefed_task',
+          `Task '${it.title}' has no goal and no queue-time tab context to compose a brief from (source: ${it.source || 'none'}). ` +
+          'Write a goal, or queue the item from the tab that has the context - the outbox takes no silent open tasks.');
+        const bad = lintPointers(br.pointers, (cands) => cands.some((c) => fs.existsSync(path.resolve(here, c))));
+        if (bad.length) return fail(res, 400, 'bad_pointer',
+          `Brief for '${it.title}' points at packet paths that do not exist: ${bad.join(', ')}. ` +
+          'Pointer lint refused the whole write; nothing was queued.');
+        built.push({ ...it, brief: br });
+      }
       const file = opsFile('agent-queue.md');
       const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
-      const { text, tids } = appendPacket(existing, goal, clean);
+      const { text, tids } = appendPacket(existing, goal, built);
       fs.writeFileSync(file, text);
       const readback = fs.readFileSync(file, 'utf8');
       const confirmed = tids.every((t) => readback.includes('## ' + t + ' '));
-      return send(res, 200, { ok: true, written: true, path: path.relative(here, file), tids, confirmed_on_readback: confirmed });
+      return send(res, 200, { ok: true, written: true, path: path.relative(here, file), tids, briefed: true, confirmed_on_readback: confirmed });
     }
     if (p === '/agent/state' && req.method === 'GET') {
       const file = opsFile('agent-queue.md');

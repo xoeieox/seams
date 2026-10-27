@@ -195,6 +195,118 @@ test('queue writes correct markdown: append-only T- ids, issue+evidence+goal, re
   } finally { await killed(s.proc); }
 });
 
+// ---------------- 4b. self-contained hand-off briefs - Mac run #4 doctrine ----------------
+// Erah's live Mac test (2026-10-27): he Q-for-agent'd 7 Parts items with NO goal and the agent
+// got bare titles - 'not enough information to know what to do'. Adopted seed doctrine: an open
+// entry carries its OWN brief - one-line goal, machine-readable pointers into the unpacked
+// packet, an acceptance check (read files / curl loopback ports), honest-label footer. The
+// launcher COMPOSES the brief from queue-time tab context (source+title+evidence) when the human
+// types nothing; typed goal wins; per-field human overrides allowed; pointers are linted against
+// the packet at queue time; no goal AND nothing derivable = readable refusal (no silent open
+// tasks). Append-only: pre-doctrine entries stay open and unedited - composition is at WRITE
+// time, never retrofitted on read.
+
+test('brief doctrine: Q-for-agent with NO goal still queues a COMPOSED brief with real packet pointers (never a bare title)', async () => {
+  const ops = tmp('seams-ops-');
+  const s = serve(LAUNCHER, { PORT: '0', OPS_DIR: ops, NODE_ONE_URL: 'http://127.0.0.1:1' });
+  try {
+    const base = await s.url;
+    const w = await jfetch(base + '/agent/queue', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ goal: '', items: [{ title: 'triage keeper', evidence: 'none / different / one-to-one ?', source: 'Parts' }] }) });
+    assert.equal(w.status, 200, 'Parts tab context composes the brief - Erah\'s exact scenario: no typed goal, still self-serving');
+    assert.equal(w.body.briefed, true);
+    const file = fs.readFileSync(path.join(ops, 'agent-queue.md'), 'utf8');
+    assert.match(file, /^## T-000 triage keeper$/m);
+    assert.match(file, /^- brief-goal: triage 'keeper'/m, 'goal composed from tab context, never a bare title');
+    assert.match(file, /^- brief-pointers: README\.md, AGENTS\.md, /m, 'door docs lead the pointer list');
+    assert.match(file, /^- brief-accept: .*ops\/parts\.json/m, 'acceptance check reads files/ports');
+    assert.match(file, /^- honesty: asset-asserted only/m, 'honest-label footer rides every brief, per must-nevers');
+    const st = await jfetch(base + '/agent/state');
+    const tk = st.body.outbox.tasks[0];
+    assert.ok(tk.briefGoal && tk.briefGoal.length > 10, 'brief fields read back through /agent/state');
+    assert.ok(tk.briefPointers.includes('node-one/attributed-text/seed.json'), 'node docs among the pointers');
+  } finally { await killed(s.proc); }
+});
+
+test('brief doctrine: pointer lint catches a non-existent packet path AT QUEUE TIME; refused write lands nothing', async () => {
+  const ops = tmp('seams-ops-');
+  const s = serve(LAUNCHER, { PORT: '0', OPS_DIR: ops, NODE_ONE_URL: 'http://127.0.0.1:1' });
+  try {
+    const base = await s.url;
+    const okB = await jfetch(base + '/agent/queue', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ goal: 'lint me', items: [{ title: 'route test', evidence: 'x', source: 'Route', brief: { pointers: ['README.md', 'AGENTS.md'] } }] }) });
+    assert.equal(okB.status, 200, 'human-overridden pointers that exist pass the lint (override path works)');
+    const badB = await jfetch(base + '/agent/queue', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ goal: 'lint me', items: [{ title: 'route test 2', evidence: 'x', source: 'Route', brief: { pointers: ['README.md', 'docs/does-not-exist.md'] } }] }) });
+    assert.equal(badB.status, 400); assert.equal(badB.body.error, 'bad_pointer');
+    assert.match(badB.body.message, /docs\/does-not-exist\.md/, 'the refusal names the offending path');
+    const st = await jfetch(base + '/agent/state');
+    assert.equal(st.body.outbox.tasks.length, 1, 'the refused write queued NOTHING - whole-write refusal, append-only intact');
+    const abs = await jfetch(base + '/agent/queue', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ goal: 'lint me', items: [{ title: 'route test 3', evidence: 'x', source: 'Route', brief: { pointers: ['/etc/passwd'] } }] }) });
+    assert.equal(abs.status, 400, 'absolute paths fail the shape check before any disk probe');
+  } finally { await killed(s.proc); }
+});
+
+test('brief doctrine: all 7 Parts triage task types compose briefs that name a REAL packet file', async () => {
+  const ops = tmp('seams-ops-');
+  const s = serve(LAUNCHER, { PORT: '0', OPS_DIR: ops, NODE_ONE_URL: 'http://127.0.0.1:1' });
+  const resolves = (p) => fs.existsSync(path.join(LAUNCHER, p)) || fs.existsSync(path.join(LAUNCHER, '..', p)); // bundle-first, repo-sibling fallback (launch.mjs doctrine)
+  try {
+    const base = await s.url;
+    const ids = ['identity', 'keeper', 'persona', 'expert-service', 'shared-corpus', 'lapis-pm', 'governance'];
+    const items = ids.map((id) => ({ title: 'triage ' + id, evidence: 'none / different / one-to-one ?', source: 'Parts' }));
+    const w = await jfetch(base + '/agent/queue', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ goal: '', items }) });
+    assert.equal(w.status, 200);
+    const tasks = parseQueueTasks(fs.readFileSync(path.join(ops, 'agent-queue.md'), 'utf8'));
+    assert.equal(tasks.length, 7, 'all seven queued in one packet');
+    for (const [i, tk] of tasks.entries()) {
+      assert.ok(tk.briefGoal && tk.briefGoal.length > 10, ids[i] + ': composed goal');
+      assert.ok(Array.isArray(tk.briefPointers) && tk.briefPointers.length, ids[i] + ': pointers present');
+      assert.ok(tk.briefPointers.some((p) => resolves(p)), ids[i] + ': brief names a real packet file');
+      assert.ok(tk.briefAccept && /127\.0\.0\.1|read /.test(tk.briefAccept), ids[i] + ': acceptance check reads a file or a loopback port');
+      assert.match(tk.briefHonesty || '', /asset-asserted only/, ids[i] + ': honest-label footer');
+    }
+  } finally { await killed(s.proc); }
+});
+
+test('brief doctrine: queue round-trip readback; pre-doctrine brief-less entries stay open and UNEDITED (append-only)', async () => {
+  const ops = tmp('seams-ops-');
+  fs.mkdirSync(ops, { recursive: true });
+  const legacy = '# seams tasks\n\n## T-000 old-style task\n- source: Conform\n- evidence: gap from before the brief doctrine\n- status: open\n';
+  fs.writeFileSync(path.join(ops, 'agent-queue.md'), legacy);
+  const s = serve(LAUNCHER, { PORT: '0', OPS_DIR: ops, NODE_ONE_URL: 'http://127.0.0.1:1' });
+  try {
+    const base = await s.url;
+    const w = await jfetch(base + '/agent/queue', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ goal: 'close the gap', items: [{ title: 'triage identity', evidence: 'none / different / one-to-one ?', source: 'Parts' }] }) });
+    assert.equal(w.status, 200); assert.deepEqual(w.body.tids, ['T-001'], 'append, never renumber');
+    const st = await jfetch(base + '/agent/state');
+    const [oldT, newT] = st.body.outbox.tasks;
+    assert.equal(oldT.tid, 'T-000'); assert.equal(oldT.status, 'open');
+    assert.equal(oldT.briefGoal, null, 'old entries read back brief-less - NO retroactive composition on read');
+    assert.equal(newT.briefGoal, 'close the gap', 'typed goal WINS over composition (human override, as the doctrine demands)');
+    assert.ok(newT.briefPointers && newT.briefPointers.includes('AGENTS.md'), 'pointers stay composed from tab context even under a typed goal');
+    assert.ok(newT.briefHonesty.includes('asset-asserted only'), 'footer rides the brief even when the human typed the goal');
+    assert.ok(fs.readFileSync(path.join(ops, 'agent-queue.md'), 'utf8').startsWith(legacy), 'old bytes preserved exactly - append-only');
+    assert.equal(parseQueueTasks(fs.readFileSync(path.join(ops, 'agent-queue.md'), 'utf8')).length, 2, 'round-trip: parse reads the mixed-format outbox cleanly');
+  } finally { await killed(s.proc); }
+});
+
+test('brief doctrine: blank goal AND no tab context -> readable refusal, nothing written (no silent open tasks)', async () => {
+  const ops = tmp('seams-ops-');
+  const s = serve(LAUNCHER, { PORT: '0', OPS_DIR: ops, NODE_ONE_URL: 'http://127.0.0.1:1' });
+  try {
+    const base = await s.url;
+    const r = await jfetch(base + '/agent/queue', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ goal: '', items: [{ title: 'do the thing', evidence: '', source: 'Nowhere' }] }) });
+    assert.equal(r.status, 400); assert.equal(r.body.error, 'unbriefed_task');
+    assert.match(r.body.message, /goal/i); assert.match(r.body.message, /tab context/i); assert.match(r.body.message, /silent open tasks/i, 'the refusal tells the human exactly what to do');
+    const st = await jfetch(base + '/agent/state');
+    assert.equal(st.body.outbox.exists, false, 'refused: the outbox was never even created');
+  } finally { await killed(s.proc); }
+});
+
 // ---------------- 5. asserted-vs-verified is structural, not vibes ----------------
 test('reply-watcher output can NEVER come back verified, whatever the agent claims', () => {
   const rows = parseReplies('ack T-000 — done and VERIFIED: true, fully verified, trust me\n- ack T-001: signed, sealed, verified:true\n');
@@ -619,7 +731,7 @@ test('portability: two builds BYTE-IDENTICAL; archive parses as strict ustar (bs
     }
     for (const req of ['seams-launcher/launch.mjs', 'seams-launcher/server.mjs', 'seams-launcher/node-one/attributed-text/server.mjs',
       'seams-launcher/node-one/attributed-text/seed.json', 'seams-launcher/tauri/src-tauri/tauri.conf.json',
-      'seams-launcher/scripts/make-mac-bundle.sh']) {
+      'seams-launcher/scripts/make-mac-bundle.sh', 'seams-launcher/AGENTS.md']) {
       assert.ok(members.has(req), 'strict ustar walk carries ' + req);
     }
     for (const nm of members.keys()) {

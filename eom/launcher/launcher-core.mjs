@@ -181,26 +181,110 @@ export function nextTaskSeq(text) {
   for (const m of String(text ?? '').matchAll(/## T-(\d{3,})\b/g)) max = Math.max(max, Number(m[1]));
   return max + 1;
 }
+// ---------------- self-contained hand-off briefs (Mac run #4 doctrine, 2026-10-27) ----------------
+// Erah Q-for-agent'd 7 Parts items with NO goal and the agent got bare titles - 'not enough
+// information to know what to do'. Seed doctrine: the agent's brain lives in the packet docs, so
+// every open entry carries its own brief: a one-line goal, machine-readable pointers into the
+// unpacked packet, an acceptance check (read a file / curl a loopback port), and the honest-label
+// footer. The launcher COMPOSES the brief from queue-time tab context (source + title + evidence)
+// when the human types nothing; a typed goal wins; a human may override each field per item. No
+// goal AND nothing derivable = readable refusal (400 unbriefed_task) - no silent open tasks.
+// Append-only: entries written before this doctrine stay open, unedited, brief-less; readers
+// work them from README.md + AGENTS.md as before.
+export const BRIEF_HONESTY = 'asset-asserted only - the launcher composed this brief from queue-time tab context and verified NOTHING; agent replies are asserted, and only a fresh conform run turns anything verified';
+const DOOR = ['README.md', 'AGENTS.md'];
+const NODE_DOCS = ['node-one/attributed-text/README.md'];
+const NODE_SRC = ['node-one/attributed-text/server.mjs', 'node-one/attributed-text/seed.json'];
+const HANDOFF_DOC = ['design-handoff-2026-10-26/docs/agent-handoff-open-questions.md'];
+const SPEC_DOC = ['design-handoff-2026-10-26/docs/seams-launcher-spec.md'];
+
+// Pure: composes { goal, pointers[], accept } or returns null = unbriefable (no goal, no context).
+// Human brief overrides (per field) win over composition. pointers stay packet-relative.
+export function composeBrief(item, packetGoal = '') {
+  const t = String(item?.title ?? '').trim();
+  const ev = String(item?.evidence ?? '').trim();
+  const src = String(item?.source ?? '').trim();
+  const human = item?.brief && typeof item.brief === 'object' ? item.brief : null;
+  const humanGoal = String(packetGoal || '').trim() || String(human?.goal ?? '').trim();
+  let a = null;
+  const pm = t.match(/^triage\s+([a-z][a-z0-9-]{1,30})\b/i);
+  if (pm && (!src || /parts/i.test(src))) {
+    const id = pm[1].toLowerCase();
+    a = {
+      goal: `triage '${id}' in the Parts tab: pick none / different / one-to-one / skipped; if growing it, seed from node-one and save ops/parts.json`,
+      pointers: [...DOOR, ...NODE_DOCS, 'node-one/attributed-text/seed.json'],
+      accept: `ops/parts.json lists '${id}' triaged (not missing, not none) and a fresh conform run on the launcher (http://127.0.0.1:4173) shows no gap for '${id}'`,
+    };
+  } else if (/^parts$/i.test(src)) {
+    a = { goal: `${t}${ev ? ' - ' + ev : ''} (Parts tab: pick the decision and save ops/parts.json)`, pointers: [...DOOR, ...NODE_DOCS], accept: `read ops/parts.json, then a fresh conform run on the launcher (http://127.0.0.1:4173): the Parts gap is gone` };
+  } else if (/^(integrity|quarantine)$/i.test(src)) {
+    a = { goal: `clear node-one's QUARANTINED log integrity so hello reports clean and export answers 200: ${ev || 'log integrity broken'}`, pointers: [...DOOR, ...NODE_DOCS, ...NODE_SRC], accept: `curl http://127.0.0.1:8080/api/hello no longer reports QUARANTINED and curl http://127.0.0.1:8080/api/export returns 200` };
+  } else if (/^conform$/i.test(src)) {
+    a = { goal: `close the conform gap '${t}': ${ev || 'see the gap grow_ref in the Conform tab'}`, pointers: [...DOOR, ...SPEC_DOC], accept: `fresh conform run on the launcher (http://127.0.0.1:4173): the gap '${t}' is gone` };
+  } else if (/^route$/i.test(src)) {
+    a = { goal: 'prove the hand-off route end-to-end: read this entry out of ops/agent-queue.md and leave an ack line in ops/agent-replies.md', pointers: [...DOOR, ...HANDOFF_DOC], accept: `grep '^ack ' ops/agent-replies.md lists an ack line for this entry's T- id (the ack is asserted, never auto-verified)` };
+  } else if (ev) {
+    a = { goal: `${t}: ${ev}`.slice(0, 200), pointers: [...DOOR], accept: 'read the files named in this entry (they exist in the packet): the described work is visible there; an ack line lands in ops/agent-replies.md' };
+  }
+  if (!a && !humanGoal) return null; // blank goal + no queue-time tab context -> the server refuses readably
+  const base = a || { pointers: [...DOOR], accept: 'read ops/agent-replies.md for an ack line for this entry; the launcher marks every ack asserted, never verified' };
+  const pointers = (Array.isArray(human?.pointers) && human.pointers.length ? human.pointers : base.pointers)
+    .slice(0, 8).map((x) => String(x).trim()).filter(Boolean);
+  const goal = humanGoal || base.goal || t;
+  const accept = String(human?.accept ?? '').trim() || base.accept || goal;
+  return { goal, pointers, accept };
+}
+
+// Pointer lint: paths must stay packet-relative (no absolute, no '..' hops) and must exist on
+// disk under the packet, probed bundle-first then repo-sibling - the launch.mjs layout doctrine
+// (a bundle has node-one/ inside; the repo keeps it a sibling). Returns the offenders ([] = clean).
+export function lintPointers(pointers, existsAny) {
+  const bad = [];
+  for (const raw of Array.isArray(pointers) ? pointers : []) {
+    const p = String(raw).replace(/\\/g, '/').replace(/^\.\/*/g, '').trim();
+    if (!p || p.startsWith('/') || p.split('/').includes('..')) { bad.push(String(raw) + ' (shape)'); continue; }
+    if (!existsAny([p, '../' + p])) bad.push(p);
+  }
+  return bad;
+}
+
 export function appendPacket(existing, goal, items) {
   const body = existing && existing.trim() ? existing.replace(/\s*$/, '\n\n') : '# seams tasks\n';
   const base = nextTaskSeq(existing);
   const block = (goal ? '\ngoal: ' + goal + '\n\n' : '\n')
     + items.map((q, i) =>
       `## T-${String(base + i).padStart(3, '0')} ${q.title}\n- source: ${q.source}\n- evidence: ${q.evidence}\n- status: open`
+      + (q.brief
+        ? `\n- brief-goal: ${q.brief.goal}\n- brief-pointers: ${q.brief.pointers.join(', ')}\n- brief-accept: ${q.brief.accept}\n- honesty: ${BRIEF_HONESTY}`
+        : '')
     ).join('\n\n') + '\n';
   return { text: body + block, tids: items.map((_, i) => 'T-' + String(base + i).padStart(3, '0')) };
 }
 
 // Read the outbox back (the server confirms a write by reading the file and pairing tids).
+// Brief fields read back too; pre-doctrine (brief-less) entries parse with null brief fields -
+// append-only, they stay open and untouched.
 export function parseQueueTasks(text) {
   const rows = [];
   const src = String(text ?? '');
-  for (const m of src.matchAll(/^## (T-\d{3,}) (.+)$/gm)) {
-    const tail = src.slice(m.index + m[0].length, m.index + m[0].length + 300);
+  const heads = [...src.matchAll(/^## (T-\d{3,}) (.+)$/gm)];
+  for (let i = 0; i < heads.length; i++) {
+    const m = heads[i];
+    const start = m.index + m[0].length;
+    // clamp each entry's field window to the NEXT header (or 700 chars at the tail) - a short
+    // legacy entry must never borrow the next entry's brief lines (caught by local unit smoke)
+    const end = i + 1 < heads.length ? heads[i + 1].index : Math.min(src.length, start + 700);
+    const tail = src.slice(start, end);
+    const line = (re) => (tail.match(re) || [])[1]?.trim();
     rows.push({
       tid: m[1], title: m[2].trim(),
-      source: (tail.match(/^- source:\s*(.+)$/m) || [])[1]?.trim() || '',
-      status: (tail.match(/^- status:\s*(.+)$/m) || [])[1]?.trim() || 'open',
+      source: line(/^- source:\s*(.+)$/m) || '',
+      status: line(/^- status:\s*(.+)$/m) || 'open',
+      briefGoal: line(/^- brief-goal:\s*(.+)$/m) || null,
+      briefPointers: (line(/^- brief-pointers:\s*(.+)$/m) || '').split(',').map((s) => s.trim()).filter(Boolean).length
+        ? line(/^- brief-pointers:\s*(.+)$/m).split(',').map((s) => s.trim()).filter(Boolean) : null,
+      briefAccept: line(/^- brief-accept:\s*(.+)$/m) || null,
+      briefHonesty: line(/^- honesty:\s*(.+)$/m) || null,
     });
   }
   return rows;

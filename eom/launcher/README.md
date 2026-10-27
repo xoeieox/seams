@@ -203,10 +203,43 @@ override what the bundle packs.
 - No exposure/tunnel UI: the footer states `exposure: blocked-on-ruling`; the
   server refuses non-loopback binds outright.
 
+## Agent hand-off: the brief doctrine (Mac run #4, 2026-10-27)
+
+Seed doctrine (Erah): the packet docs are the instruction source — "as long as the agent can
+read a file on the machine, it should know what to do and do it, without asking questions."
+So every entry the queue accepts carries a **self-sufficient brief**:
+
+```markdown
+## T-007 triage keeper
+- source: Parts
+- evidence: none / different / one-to-one ?
+- status: open
+- brief-goal: triage 'keeper' in the Parts tab: pick none / different / one-to-one / skipped; ...
+- brief-pointers: README.md, AGENTS.md, node-one/attributed-text/README.md, node-one/attributed-text/seed.json
+- brief-accept: ops/parts.json lists 'keeper' triaged ... and a fresh conform run (http://127.0.0.1:4173) shows no gap
+- honesty: asset-asserted only - the launcher composed this brief from queue-time tab context and verified NOTHING; ...
+```
+
+Rules the server enforces at queue time (`POST /agent/queue`):
+
+- The launcher **composes** goal/pointers/accept from the queue-time tab context (`source` +
+  `title` + `evidence`): Q-for-agent from Parts with no typed goal still produces a brief, not
+  a bare title. A typed goal (or a per-item `brief` override) wins; every pointer must name a
+  file that exists in the packet — bundle-first, repo-sibling fallback (the `launch.mjs` layout
+  doctrine). One bad pointer refuses the whole write (`bad_pointer`); nothing partial lands.
+- **No silent open tasks:** a task with no goal AND nothing derivable from tab context is
+  refused readably (`unbriefed_task`).
+- **Append-only:** entries written before this doctrine stay open, unedited, brief-less —
+  composition happens at write time, never retrofitted on read.
+- The agent-facing door is [`AGENTS.md`](./AGENTS.md) (packet root): how to read the queue, what
+  the honest-label footer means, where the node docs live, and the must-nevers. Queue entries
+  link it by name; the agent's brain lives in the packet docs, not the UI.
+
 ## Layout of this directory
 
 | file | role |
 | --- | --- |
+| `AGENTS.md` | **the agent's door**: how to read `ops/agent-queue.md`, what the honest-label footer means, where the node docs live, the must-nevers. Queue entries link it by name. |
 | `launch.mjs` | **the one command**: spawns+supervises node-one and the launcher (reuses busy ports cleanly), Ctrl-C reaps both (ps-verified) |
 | `server.mjs` | loopback static server + verbatim proxy + ops-file/queue endpoints; friendly “already running” on a busy port, never a stack trace |
 | `launcher-core.mjs` | pure logic: pins, gate checks, refusal render table, holds, queue markdown, conform gaps, config parse/render |
@@ -215,7 +248,7 @@ override what the bundle packs.
 | `scripts/make-mac-bundle.sh` | packs this dir into one sha256-summed tarball for the Mac (Kyma-style iteration) |
 | `scripts/make-icons.mjs` | regenerates the icons deterministically, zero deps (pure-zlib PNG encoder) |
 | `tauri/` | **Tauri 2 native shell**: Rust sidecar supervisor around `launch.mjs`, Erah's Kyma-style Mac iteration path (see below) |
-| `test/launcher.test.mjs` | the launcher test suite (`node --test`) |
+| `test/launcher.test.mjs` | the launcher test suite (`node --test`) — includes the brief-doctrine gates |
 | `design-handoff-2026-10-26/` | canonicalized Claude Design handoff (8 files + CHECKSUMS) |
 
 ## Not yet claimable
