@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Seams launcher - the ONE command an end user runs. Zero deps, Node 18+.
 //
-//   node eom/launcher/launch.mjs
+//   repo:    node eom/launcher/launch.mjs      bundle: node launch.mjs
+//   tauri dev (beforeDevCommand): node launch.mjs --dev   (self-locating; servers stay up, exits 0)
 //
 // It ensures BOTH halves of the experience are up, supervises what it starts, and takes both
 // down on Ctrl-C: (1) the node-one attributed-text server, (2) the launcher window server that
@@ -13,13 +14,32 @@
 //   NODE_ONE_URL - expert override: point the proxy at an already-running loopback node-one
 //   instead of having this command start one. Non-loopback is refused here AND by the server.
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const LAUNCHER_SERVER = path.join(here, 'server.mjs');
-const NODE_ONE_SERVER = path.join(here, '..', 'node-one', 'attributed-text', 'server.mjs');
+
+// Mac run #1 triage (2026-10-26): sibling paths derive from import.meta.url ONLY and resolve by
+// EXISTENCE PROBE - never from the shell's working directory, and never a single repo-shaped
+// path. Two shipped
+// layouts, bundle-first (inside an unpacked bundle the inner copy must always win):
+//   bundle: launch.mjs at the bundle ROOT, node-one/ and public/ its siblings (Mac delivery)
+//   repo:   launch.mjs at eom/launcher/, node-one/ the sibling under eom/ (BRIX working tree)
+// The old hardcoded `here/../node-one/...` escaped an unpacked bundle by one '..' and died
+// MODULE_NOT_FOUND outside it - Erah's first Mac run, killed before Rust ever compiled.
+const DEV = process.argv.includes('--dev');
+const NODE_ONE_CANDIDATES = [
+  ['bundle', path.join(here, 'node-one', 'attributed-text', 'server.mjs')],
+  ['repo', path.join(here, '..', 'node-one', 'attributed-text', 'server.mjs')],
+];
+const LAYOUT = (() => {
+  for (const [name, p] of NODE_ONE_CANDIDATES) if (fs.existsSync(p)) return { name, server: p };
+  return null;
+})();
 
 const PORT = Number(process.env.PORT || 4173);
 const NODE_ONE_PORT = Number(process.env.NODE_ONE_PORT || 8080);
@@ -55,18 +75,30 @@ const portInUse = (port) => new Promise((resolve) => {
 const children = []; // {name, proc, out} - only what THIS process spawned; existing servers stay owned by whoever started them
 let shuttingDown = false;
 
+// dev mode (tauri beforeDevCommand) detaches the children with their logs in a file: they MUST
+// outlive this launcher process, and pipes would EPIPE-kill them silently when we exit(0).
+const DEV_LOG = DEV ? (process.env.SEAMS_DEV_LOG || path.join(os.tmpdir(), 'seams-launcher-dev.log')) : null;
+let devLogFd = null;
+if (DEV) {
+  try { devLogFd = fs.openSync(DEV_LOG, 'a'); fs.writeSync(devLogFd, `\n--- dev boot ${new Date().toISOString()} ---\n`); }
+  catch { devLogFd = null; say(`dev log unavailable at ${DEV_LOG}; children log to /dev/null instead`); }
+}
+
 function supervise(name, entry, env) {
+  const detached = DEV;
   const proc = spawn(process.execPath, [entry], {
     env: { ...process.env, ...env },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: detached ? ['ignore', devLogFd ?? 'ignore', devLogFd ?? 'ignore'] : ['ignore', 'pipe', 'pipe'],
+    detached,
   });
-  const child = { name, proc, out: '', exited: null };
+  if (detached) proc.unref();
+  const child = { name, proc, out: '', exited: null, detached };
   const fwd = (stream) => (c) => {
     child.out += String(c);
     for (const line of String(c).split('\n')) if (line.trim()) stream.write(`  [${name}] │ ${line}\n`);
   };
-  proc.stdout.on('data', fwd(process.stdout));
-  proc.stderr.on('data', fwd(process.stderr));
+  if (proc.stdout) proc.stdout.on('data', fwd(process.stdout));
+  if (proc.stderr) proc.stderr.on('data', fwd(process.stderr));
   proc.on('error', (e) => { child.exited = { code: -1, signal: null }; child.out += String(e && e.message); });
   proc.on('exit', (code, signal) => { child.exited = { code, signal }; });
   children.push(child);
@@ -80,7 +112,7 @@ async function waitUp(child, port, what) {
   while (Date.now() < deadline) {
     if (await portInUse(port)) return 'up';
     if (child.exited) {
-      if (child.exited.code === 0 && /already running/i.test(child.out)) return 'reused';
+      if (child.exited.code === 0 && (child.detached || /already running/i.test(child.out))) return 'reused';
       throw new Error(`${child.name} exited (${child.exited.code ?? child.exited.signal}) before ${what} came up`);
     }
     await new Promise((r) => setTimeout(r, 120));
@@ -123,49 +155,79 @@ process.on('SIGTERM', () => shutdown('sigterm'));
 
 // ---------------- the ladder ----------------
 say('seams launcher - one command, both servers, loopback only.');
+say(`layout: ${LAYOUT ? LAYOUT.name : 'node-one not found on disk'} · launcher server ${LAUNCHER_SERVER}`);
 
-let oneChild = null;
-if (CUSTOM_ONE) {
-  say(`operator-provided node-one at ${NODE_ONE_URL} (not spawned here; leaving it alone)`);
-} else if (await portInUse(NODE_ONE_PORT)) {
-  say(`node-one already running on 127.0.0.1:${NODE_ONE_PORT} - reusing it (nothing spawned)`);
-} else {
-  oneChild = supervise('node-one', NODE_ONE_SERVER, {
-    PORT: String(NODE_ONE_PORT),
-    ...(process.env.NODE_ONE_DATA_DIR ? { DATA_DIR: process.env.NODE_ONE_DATA_DIR } : {}),
-  });
-  await waitUp(oneChild, NODE_ONE_PORT, 'node-one');
+async function boot() {
+  let oneChild = null;
+  if (CUSTOM_ONE) {
+    say(`operator-provided node-one at ${NODE_ONE_URL} (not spawned here; leaving it alone)`);
+  } else if (await portInUse(NODE_ONE_PORT)) {
+    say(`node-one already running on 127.0.0.1:${NODE_ONE_PORT} - reusing it (nothing spawned)`);
+  } else if (!LAYOUT) {
+    say('refusing to start: node-one server.mjs not found. Looked in:');
+    for (const [, p] of NODE_ONE_CANDIDATES) say(`  ${p}`);
+    say('an unpacked Mac bundle ships node-one/ beside launch.mjs - rebuild with make-mac-bundle.sh,');
+    say('or point NODE_ONE_URL at an already-running loopback node-one (expert override).');
+    say('servers are DOWN - nothing was left running to talk to.');
+    process.exit(1);
+  } else {
+    say(`node-one entry: ${LAYOUT.server}`);
+    oneChild = supervise('node-one', LAYOUT.server, {
+      PORT: String(NODE_ONE_PORT),
+      ...(process.env.NODE_ONE_DATA_DIR ? { DATA_DIR: process.env.NODE_ONE_DATA_DIR } : {}),
+    });
+    await waitUp(oneChild, NODE_ONE_PORT, 'node-one');
+  }
+
+  let launcherChild = null;
+  if (await portInUse(PORT)) {
+    say(`launcher already running on 127.0.0.1:${PORT} - open http://127.0.0.1:${PORT} (reusing it; nothing new started${oneChild ? '' : ', nothing to supervise'})`);
+  } else {
+    launcherChild = supervise('launcher', LAUNCHER_SERVER, {
+      PORT: String(PORT),
+      NODE_ONE_URL,
+      ...(process.env.OPS_DIR ? { OPS_DIR: process.env.OPS_DIR } : {}),
+    });
+    await waitUp(launcherChild, PORT, 'the launcher window');
+  }
+
+  if (!oneChild && !launcherChild) {
+    say(`everything already running - open http://127.0.0.1:${PORT}`);
+    process.exit(0);
+  }
+
+  if (DEV) {
+    // beforeDevCommand posture: BOTH ports answered, children detached and left running, exit 0
+    // so tauri dev proceeds. Any failure above lands in the catch below: printed refusal,
+    // nonzero exit - beforeDevCommand fails LOUDLY instead of masking into a 180s poll timeout.
+    say(`dev: both servers up and DETACHED (they stay up after this exits). child logs: ${devLogFd !== null ? DEV_LOG : '/dev/null'}`);
+    process.exit(0);
+  }
+
+  // supervision: if a child we own dies on its own (not via shutdown), come down cleanly too -
+  // half a launcher (window without node, or node without window) is not an experience.
+  for (const child of children) {
+    child.proc.on('exit', (code, signal) => {
+      if (shuttingDown) return;
+      if (code === 0 && /already running/i.test(child.out)) return; // benign bind race
+      say(`${child.name} exited (${code ?? signal}); bringing the rest down.`);
+      shutdown('child lost');
+    });
+  }
+
+  console.log('');
+  say(`Seams Launcher is up → http://127.0.0.1:${PORT}   (Ctrl-C stops what this command started)`);
+  say('install it as an app: Chrome/Edge ⌘-menu → "Install Seams Launcher" · Safari Share → "Add to Dock" · Android ⋮ → "Install app"');
+  say('127.0.0.1 is a secure context, so the install prompt works over plain http - no tunnel, no TLS, nothing leaves the machine.');
 }
 
-let launcherChild = null;
-if (await portInUse(PORT)) {
-  say(`launcher already running on 127.0.0.1:${PORT} - open http://127.0.0.1:${PORT} (reusing it; nothing new started${oneChild ? '' : ', nothing to supervise'})`);
-} else {
-  launcherChild = supervise('launcher', LAUNCHER_SERVER, {
-    PORT: String(PORT),
-    NODE_ONE_URL,
-    ...(process.env.OPS_DIR ? { OPS_DIR: process.env.OPS_DIR } : {}),
-  });
-  await waitUp(launcherChild, PORT, 'the launcher window');
-}
-
-if (!oneChild && !launcherChild) {
-  say(`everything already running - open http://127.0.0.1:${PORT}`);
-  process.exit(0);
-}
-
-// supervision: if a child we own dies on its own (not via shutdown), come down cleanly too -
-// half a launcher (window without node, or node without window) is not an experience.
-for (const child of children) {
-  child.proc.on('exit', (code, signal) => {
-    if (shuttingDown) return;
-    if (code === 0 && /already running/i.test(child.out)) return; // benign bind race
-    say(`${child.name} exited (${code ?? signal}); bringing the rest down.`);
-    shutdown('child lost');
-  });
-}
-
-console.log('');
-say(`Seams Launcher is up → http://127.0.0.1:${PORT}   (Ctrl-C stops what this command started)`);
-say('install it as an app: Chrome/Edge ⌘-menu → "Install Seams Launcher" · Safari Share → "Add to Dock" · Android ⋮ → "Install app"');
-say('127.0.0.1 is a secure context, so the install prompt works over plain http - no tunnel, no TLS, nothing leaves the machine.');
+boot().catch((err) => {
+  say(`FAILED: ${err.message}`);
+  if (DEV && DEV_LOG && devLogFd !== null) {
+    try {
+      for (const l of fs.readFileSync(DEV_LOG, 'utf8').trimEnd().split('\n').slice(-20)) process.stdout.write(`  dev-log │ ${l}\n`);
+    } catch { /* no log to show */ }
+  }
+  say('servers are DOWN - nothing was left running to talk to.');
+  process.exit(1);
+});

@@ -12,7 +12,12 @@
 // spawns+supervises both servers, ctrl-c reaps both ps-verified, a busy port is REUSE with a
 // clear message and no EADDRINUSE stack trace). And the Tauri shell (Erah's ruling
 // 16:11 PDT - Kyma-style Mac iteration): scaffold consistency, the zero-frontend-deps rule,
-// and the one-command Mac bundle. Eighteen tests; every server the suite starts is
+// and the one-command Mac bundle - plus the bundle-LAYOUT boot (Mac run #1 triage
+// 2026-10-26: Erah's first `npm run tauri` died before Rust compiled - launch.mjs resolved
+// node-one with the repo layout, one '..' above the unpacked bundle, and the shotgun
+// beforeDevCommand swallowed it into a 180s tauri poll timeout). The beforeDevCommand
+// sequence now runs against an unpacked bundle from <tmp>/tauri as cwd, as a standing gate.
+// Twenty-one tests; every server the suite starts is
 // killed and ps-verified gone.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,7 +38,9 @@ import {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const LAUNCHER = path.join(here, '..', 'server.mjs');
 const LAUNCH = path.join(here, '..', 'launch.mjs');
-const NODE_ONE = path.join(here, '..', '..', 'node-one', 'attributed-text', 'server.mjs');
+const NODE_ONE = [path.join(here, '..', 'node-one', 'attributed-text', 'server.mjs'),   // bundle layout (flat tree)
+                  path.join(here, '..', '..', 'node-one', 'attributed-text', 'server.mjs')] // repo layout
+                 .find((p) => fs.existsSync(p)) || path.join(here, '..', '..', 'node-one', 'attributed-text', 'server.mjs');
 const ICON_SCRIPT = path.join(here, '..', 'scripts', 'make-icons.mjs');
 const ICONS_DIR = path.join(here, '..', 'public', 'icons');
 const tmp = (p) => fs.mkdtempSync(path.join(os.tmpdir(), p));
@@ -520,16 +527,105 @@ test('make-mac-bundle.sh: one command -> verified, self-describing tarball the M
   const listing = execFileSync('tar', ['-tzf', tar], { encoding: 'utf8' });
   for (const req of ['seams-launcher/launch.mjs', 'seams-launcher/server.mjs', 'seams-launcher/public/index.html',
     'seams-launcher/tauri/src-tauri/src/lib.rs', 'seams-launcher/tauri/src-tauri/icons/icon.png',
-    'seams-launcher/scripts/make-mac-bundle.sh']) {
-    assert.ok(listing.includes(req), 'tarball carries ' + req);
+    'seams-launcher/scripts/make-mac-bundle.sh',
+    'seams-launcher/node-one/attributed-text/server.mjs', 'seams-launcher/node-one/attributed-text/seed.json']) {
+    assert.ok(listing.includes(req), 'tarball carries ' + req + ' (Mac run #1: the flat tree MUST include node-one beside launch.mjs)');
   }
-  for (const banned of ['/target/', '/node_modules/', '/ops/', '/.DS_Store']) {
+  for (const banned of ['/target/', '/node_modules/', '/ops/', '/data/', '/.DS_Store']) {
     assert.ok(!listing.includes(banned), 'tarball excludes ' + banned);
   }
   fs.rmSync(out, { recursive: true, force: true });
 });
 
-// ---------------- 10. must-never surface scan on what ships to the browser ----------------
+// ---------------- 9b. bundle layout (flat tree) e2e - Mac run #1 regression ----------------
+// Runs the EXACT beforeDevCommand sequence (`node ../launch.mjs --dev`) with cwd=<tmp>/tauri
+// against a freshly built, unpacked bundle. Asserts both ports accept AFTER the launcher
+// parent exited (detached posture), node-one root 200, and the resolved node-one path lies
+// INSIDE the unpacked dir - the failure Erah hit is now a standing gate, not repo-layout-only.
+function unpackBundle() {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'seams-unpack-'));
+  execFileSync('bash', [BUNDLE_SH], { env: { ...process.env, SEAMS_BUNDLE_DIR: out, SEAMS_LAUNCHER_DIR: path.join(here, '..') } });
+  execFileSync('tar', ['-xzf', path.join(out, 'seams-launcher-mac-latest.tar.gz'), '-C', out]);
+  return { out, root: path.join(out, 'seams-launcher') };
+}
+
+test('bundle layout: beforeDevCommand boots BOTH servers from <tmp>/tauri; node-one resolves INSIDE the unpacked dir', async () => {
+  const u = unpackBundle();
+  const [pL, pN] = await freePorts(2);
+  const proc = spawn(process.execPath, ['../launch.mjs', '--dev'], {
+    cwd: path.join(u.root, 'tauri'),
+    env: { ...process.env, PORT: String(pL), NODE_ONE_PORT: String(pN), SEAMS_DEV_LOG: path.join(u.out, 'dev.log') },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let out = '';
+  proc.stdout.on('data', (c) => { out += c; });
+  proc.stderr.on('data', (c) => { out += c; });
+  const pids = [];
+  try {
+    const code = await new Promise((r) => proc.on('exit', r));
+    assert.equal(code, 0, 'beforeDevCommand posture: exits 0 once BOTH servers answer:\n' + out.slice(0, 2000));
+    assert.match(out, /layout: bundle/, 'announces which layout it picked:\n' + out.slice(0, 800));
+    const entry = out.match(/node-one entry: (\S+)/);
+    assert.ok(entry, 'announces the resolved node-one entry path:\n' + out.slice(0, 800));
+    assert.ok(entry[1].startsWith(u.root + path.sep), `node-one resolved INSIDE the unpacked dir (${entry[1]} not under ${u.root})`);
+    assert.equal(entry[1], path.join(u.root, 'node-one', 'attributed-text', 'server.mjs'), 'bundle-sibling entry - not one dir too high');
+    assert.ok(fs.existsSync(entry[1]), 'the resolved entry exists on disk');
+    assert.equal(await portTaken(pN), true, 'node-one port accepts AFTER the parent exited (detached children stayed up)');
+    assert.equal(await portTaken(pL), true, 'launcher port accepts after the parent exited');
+    assert.equal((await jfetch(`http://127.0.0.1:${pN}/`)).status, 200, 'node-one root 200 in bundle layout');
+    assert.equal((await jfetch(`http://127.0.0.1:${pL}/`)).status, 200, 'launcher window 200 in bundle layout');
+    for (const m of out.matchAll(/spawned [\w-]+ pid=(\d+)/g)) pids.push(Number(m[1]));
+    assert.equal(pids.length, 2, 'both children were SPAWNED here, not reused');
+  } finally {
+    for (const pid of pids) { try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ } }
+    const t0 = Date.now();
+    while ((await portTaken(pL)) || (await portTaken(pN))) {
+      if (Date.now() - t0 > 4000) break;
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    fs.rmSync(u.out, { recursive: true, force: true });
+  }
+  assert.equal(await portTaken(pL), false, 'cleanup: launcher port released');
+  assert.equal(await portTaken(pN), false, 'cleanup: node-one port released');
+});
+
+test('bundle layout: node-one stripped -> --dev refuses LOUDLY (nonzero exit, candidates listed, no half-boot)', async () => {
+  const u = unpackBundle();
+  fs.rmSync(path.join(u.root, 'node-one'), { recursive: true, force: true });
+  const [pL, pN] = await freePorts(2);
+  const proc = spawn(process.execPath, ['../launch.mjs', '--dev'], {
+    cwd: path.join(u.root, 'tauri'),
+    env: { ...process.env, PORT: String(pL), NODE_ONE_PORT: String(pN), SEAMS_DEV_LOG: path.join(u.out, 'dev.log') },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let out = '';
+  proc.stdout.on('data', (c) => { out += c; });
+  proc.stderr.on('data', (c) => { out += c; });
+  try {
+    const code = await new Promise((r) => proc.on('exit', r));
+    assert.notEqual(code, 0, 'beforeDevCommand FAILS LOUDLY instead of masking into a poll timeout');
+    assert.match(out, /refusing to start: node-one/, out.slice(0, 1200));
+    assert.match(out, /Looked in:/, 'lists where it searched:\n' + out.slice(0, 1200));
+    assert.ok(out.includes(path.join(u.root, 'node-one', 'attributed-text', 'server.mjs')), 'the candidate list names the bundle-sibling path');
+    assert.match(out, /servers are DOWN/, 'honest state line');
+    assert.equal(await portTaken(pL), false, 'no half-boot: nothing left on the launcher port');
+  } finally {
+    if (proc.exitCode === null) proc.kill('SIGKILL');
+    fs.rmSync(u.out, { recursive: true, force: true });
+  }
+});
+
+test('beforeDevCommand posture: ONE self-locating invocation (no shotgun, no || true); zero cwd math in launch.mjs', () => {
+  const conf = JSON.parse(fs.readFileSync(path.join(here, '..', 'tauri', 'src-tauri', 'tauri.conf.json'), 'utf8'));
+  const cmd = conf.build.beforeDevCommand;
+  assert.equal(cmd, 'node ../launch.mjs --dev', 'one invocation from tauri/ cwd; launch.mjs self-locates');
+  assert.ok(!/\|\||&&|\btrue\b/.test(cmd), 'no || shotgun / || true that swallows boot failures into 180s timeouts');
+  const src = fs.readFileSync(LAUNCH, 'utf8');
+  assert.ok(!src.includes('process.cwd'), 'launch.mjs derives no paths from the shell cwd');
+  const iB = src.indexOf("path.join(here, 'node-one', 'attributed-text', 'server.mjs')");
+  const iR = src.indexOf("path.join(here, '..', 'node-one', 'attributed-text', 'server.mjs')");
+  assert.ok(iB >= 0 && iR > iB, 'existence probe is bundle-first (the inner copy always wins)');
+});
 test('must-nevers hold in the shipped surface: no payments, no vouches, no verified:true display, no tunnel UI', async () => {
   const s = serve(LAUNCHER, { PORT: '0', OPS_DIR: tmp('seams-ops-'), NODE_ONE_URL: 'http://127.0.0.1:1' });
   try {

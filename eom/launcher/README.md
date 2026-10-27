@@ -147,6 +147,7 @@ runtime dependencies; the only npm dep is dev-only `@tauri-apps/cli`.
 
 ```bash
 scripts/make-mac-bundle.sh     # writes /var/tmp/eom-bundles/seams-launcher-mac-latest.tar.gz + .sha256
+                               # (flat tree: launcher + tauri shell + the node-one runtime it boots)
 ```
 
 ### On the Mac (Kyma-style loop)
@@ -163,14 +164,20 @@ cd ~/Downloads && sha256sum -c seams-launcher-mac-latest.tar.gz.sha256   # must 
 # macOS ships shasum, not sha256sum (unless coreutils is installed): shasum -a 256 -c seams-launcher-mac-latest.tar.gz.sha256
 tar xzf seams-launcher-mac-latest.tar.gz && cd seams-launcher
 npm install            # dev-only CLI; runtime stays zero-dep
-npm test               # the launcher suite travels with the bundle (18 tests)
+npm test               # the launcher suite travels with the bundle (21 tests, incl. the bundle-layout boot)
 npm run tauri          # iterate: Rust compiles once (~minutes), then window + live UI (tauri dev)
 npm run tauri:build    # later: the .app artifact (unsigned, see below)
 ```
 
-`tauri dev` expects the launcher server up at 127.0.0.1:4173 — the Rust sidecar starts it
-via `launch.mjs`; if you already run `node launch.mjs` in a terminal, the shell reuses
-those ports. `SEAMS_LAUNCHER_DIR` overrides where the shell finds `launch.mjs`.
+`tauri dev` expects the launcher server up at 127.0.0.1:4173 — `beforeDevCommand` runs the
+ONE self-locating command `node ../launch.mjs --dev`: launch.mjs resolves node-one/ and
+public/ by existence-probe from its OWN file location (bundle layout first — the flat
+unpacked tree — then the repo layout), detaches both servers so they stay up while the
+Rust shell runs, and exits 0 only once BOTH ports answer. A failed boot exits nonzero
+with the refusal printed, so `tauri dev` fails loudly instead of polling into a 180s
+timeout (Mac run #1 lesson). Already-running servers are reused. Child-server logs go to
+`SEAMS_DEV_LOG` (default: the system temp dir). `SEAMS_LAUNCHER_DIR`/`SEAMS_NODE_ONE_DIR`
+override what the bundle packs.
 
 ### What this shell cannot yet claim (honesty labels)
 

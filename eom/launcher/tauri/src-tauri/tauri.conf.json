@@ -6,7 +6,7 @@
   "build": {
     "devUrl": "http://127.0.0.1:4173",
     "frontendDist": "../../public",
-    "beforeDevCommand": "node ../launch.mjs || node ../../launch.mjs || node ./launch.mjs || true"
+    "beforeDevCommand": "node ../launch.mjs --dev"
   },
   "app": {
     "withGlobalTauri": false,
