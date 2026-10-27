@@ -506,12 +506,14 @@ test('tauri shell: scaffold is consistent - config, capability, rust, icons, git
 
 test('package.json: the scripts exist and the runtime stays zero-dependency', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(here, '..', 'package.json'), 'utf8'));
-  for (const s of ['dev', 'test', 'tauri', 'tauri:build']) {
+  for (const s of ['dev', 'test', 'tauri', 'tauri:build', 'tauri:icons']) {
     assert.ok(pkg.scripts[s], `script ${s} exists`);
   }
   assert.match(pkg.scripts.test, /node --test test\/launcher\.test\.mjs/, 'test is the one launcher suite file');
   assert.match(pkg.scripts.tauri, /@tauri-apps\/cli dev/);
   assert.match(pkg.scripts['tauri:build'], /@tauri-apps\/cli build/);
+  assert.match(pkg.scripts['tauri:icons'], /@tauri-apps\/cli icon \S+$/, 'tauri:icons passes exactly ONE positional input (Mac run #2: CLI 2.12.4 rejects a second positional)');
+  assert.doesNotMatch(pkg.scripts['tauri:icons'], /icon\s+\S+\s+\S+/, 'no second positional - output dir is the -o/--output OPTION; default is icons beside tauri.conf.json (live-verified: 512 flame source -> full icns/ico/png set, exit 0)');
   assert.ok(!pkg.dependencies || Object.keys(pkg.dependencies).length === 0, 'zero runtime deps holds');
   assert.ok(pkg.devDependencies['@tauri-apps/cli'], 'dev-only tauri CLI');
   assert.deepEqual(Object.keys(pkg.devDependencies), ['@tauri-apps/cli'], 'and it is the ONLY dev dep');

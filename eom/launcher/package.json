@@ -9,7 +9,7 @@
     "test": "node --test test/launcher.test.mjs",
     "tauri": "cd tauri && npx @tauri-apps/cli dev",
     "tauri:build": "cd tauri && npx @tauri-apps/cli build",
-    "tauri:icons": "cd tauri && npx @tauri-apps/cli icon src-tauri/icons/icon.png src-tauri/icons"
+    "tauri:icons": "cd tauri && npx @tauri-apps/cli icon src-tauri/icons/icon.png"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0"
