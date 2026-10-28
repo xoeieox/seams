@@ -2,7 +2,7 @@
   'use strict';
   const app = document.getElementById('app');
   let state = null;                 // current text + authors
-  let colorOn = false;
+  let colorOn = true;                 // Colour by author defaults ON (fix wave Leg 2); a persisted per-browser choice below still wins
   let draft = null;                 // unsaved edit text survives view changes
   let timer = null;
 
@@ -10,7 +10,7 @@
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
   };
-  colorOn = store.get('color') === '1';
+  colorOn = store.get('color') !== '0';   // only an explicit persisted '0' turns colours off; unset defaults ON
 
   const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
   const api = async (path, opts) => {

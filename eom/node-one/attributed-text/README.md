@@ -45,10 +45,10 @@ The script pins the wire version (`seams-wire/0.3-draft`), checks the A3-style e
 
 ## What it does
 
-- Main page: the current text, a version line, and four buttons (Edit, Colour by author, Names, History).
+- Main page: the current text, a version line, and four buttons (Edit, Colour by author - ON by default, a per-browser toggle -, Names, History).
 - Saving needs a name. Names are case-insensitive, and the first spelling used is kept.
 - Names: everyone who has edited, with edit count and how many of their words survive. Tapping one opens their **lineage**: their surviving words highlighted in the current text, each change they made (what they replaced, what they added) and what others later did to their words.
-- History: every version, read-only, with colours if toggled. Nothing is deleted.
+- History: every version, read-only, in colours (on by default; the toggle persists per browser). Nothing is deleted.
 - Concurrent edits: if you saved from an old version, the server three-way merges when the changes are far apart, and asks you to reload when they touch.
 - Limits: 10 saves per 10 min per socket-IP, 80 per 10 min overall, 10 emits per 10 min per socket-IP, 300 reads per 10 min per socket-IP, 1500 reads overall, 8000 characters, 40-character names, 64 KB bodies (`EDIT_LIMIT`, `INGEST_LIMIT`, `GLOBAL_LIMIT`, `READ_LIMIT`, `READ_GLOBAL_LIMIT`, `WINDOW_MS`).
 - Ingest gate (`POST /api/ingest`, `GET /api/hello`): the closed join surface for wire-shaped emits - see `eom/endpoint-surface/requirements.yaml` for the requirements (hello / emit / export, the join gate, and the folded host/exposure ruling of 2026-10-26).
