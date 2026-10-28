@@ -55,3 +55,7 @@ textarea:focus, input:focus { outline: 2px solid var(--muted); outline-offset: 1
 .rm { text-decoration: line-through; text-decoration-color: var(--muted); opacity: 0.85; }
 .arrow { color: var(--muted); padding: 0 0.3rem; }
 .banner { background: var(--panel); border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 1.2rem; font-size: 0.88rem; }
+
+/* KEYS demo (EOM-KEYS-2026-10-28): gateway-checked attribution vs claims, visually distinct */
+.vbadge{font:600 .72rem/1.4 ui-sans-serif,system-ui;padding:.1rem .45rem;border-radius:99px;border:1px solid #2e7d32;color:#2e7d32;background:#eef7ee;white-space:nowrap}
+.claimtag{font:600 .72rem/1.4 ui-sans-serif,system-ui;padding:.1rem .45rem;border-radius:99px;border:1px dashed #9a958c;color:#6d675e;background:#f3f1ec;white-space:nowrap}

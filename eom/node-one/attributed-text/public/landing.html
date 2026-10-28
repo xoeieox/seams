@@ -23,15 +23,16 @@
   <li><strong>An origin for the attribution protocol</strong>: it accepts exactly two wire kinds — <code>node-key</code> and <code>session-log</code> — refuses everything else at the gate (fail-closed, never accept-and-map-silently), and appends accepted emits to a hash-chained log whose integrity is verified at load time.</li>
   <li><strong>Attribution, mechanically</strong>: every accepted text keeps the name of whoever deposited it; edits fork versions by base version and word-level attribution survives revision. The state is exportable verbatim via <code>GET /api/export</code>.</li>
   <li><strong>Self-describing</strong>: <code>GET /api/hello</code> echoes the wire version this binary actually speaks, the closed gate kinds, its limits, and its chain-integrity posture. Pin it, and refuse to speak past a skew.</li>
+  <li><strong>Keys that check</strong>: an outsider mints a real Ed25519 keypair (<code>key:ed25519:&lt;base64&gt;</code>), signs their emits, and the gateway checks the signature — over the canonical body, against the key embedded in the <code>node_key</code> itself — <em>at the gate, at ingest time</em>. A checked deposit arrives with <code>creator_verified</code> set to true and its key fingerprint, in <code>GET /api/export</code> and <code>GET /api/deposits?node_key=…</code>. An unsigned deposit is still welcome: it is a name-only claim, and it says so (<code>creator_verified: false</code>). A bad signature is refused at the gate (<code>bad_signature</code>) and deposits nothing.</li>
   <li><strong>Budgeted</strong>: reads and writes are rate-limited on the socket peer address only (forwarded headers are attacker-controlled and never read). Published shape — enforced at origin: read 300/1500, ingest 10, edit 10, write-global 80, admin 10 attempts, per 10-minute window. Refusals burn nothing; only successes charge.</li>
   <li><strong>Loopback by ruling</strong>: the server binds a loopback interface; public reach, during the demo window, is Cloudflare Tunnel <em>demo plumbing</em> dialing in — wiring, not architecture. A non-loopback <code>BIND_HOST</code> refuses to boot without the named, operator-acknowledged escape hatch.</li>
 </ul>
 
 <h2>What this node is not</h2>
 <ul>
-  <li><strong>Not verified by anyone.</strong> No verifier has vouched for this node, its operator, or any deposit. Nothing here has passed a verification ceremony of any kind.</li>
+  <li><strong>Not verified by any third party.</strong> Signatures are checked by this gateway and nothing more — against the key itself, at ingest, by arithmetic. There is no verifier who vouched for this node, its operator, or any deposit, and no verification ceremony of any kind to pass. A checked signature proves control of a private key at deposit time; it does not prove identity, trust, or permanence.</li>
   <li><strong>No payments, no compensation flow.</strong> Compensation in this demo is none, stated plainly. There is no pricing, no payout rail, nothing to pay and nothing that pays.</li>
-  <li><strong>No vouches, no consent-fork machinery.</strong> The consent gate for derivation forks is unbuilt and answers <code>501 consent_gate_unbuilt</code> — this demo does not exercise consent.</li>
+  <li><strong>No vouches, no key ceremony, no consent-fork machinery.</strong> Keys are disposable: no KMS, no revocation list, no vouch chain, nobody to ask before you mint one. The consent gate for derivation forks is unbuilt and answers <code>501 consent_gate_unbuilt</code> — this demo does not exercise consent.</li>
   <li><strong>Not the production network.</strong> The steady-state posture is multi-vendor; the Cloudflare leg is explicitly the month-end demo path with a tracked obligation to move off it (the Switter lesson: a single-vendor kill-switch is not a steady state).</li>
   <li><strong>No identity claims.</strong> Node keys are self-published ed25519 identifiers; the node makes no claim about who operates any key, including its own.</li>
 </ul>
@@ -40,7 +41,8 @@
 <ul>
   <li><a href="/api/hello">GET /api/hello</a> — what this binary actually speaks.</li>
   <li><a href="/api/export">GET /api/export</a> — the whole chain, as it stands.</li>
-  <li><a href="/text">/text</a> — the human-facing page-and-attribution demo this node also serves.</li>
+  <li><a href="/demo">/demo</a> — the human-facing page-and-attribution demo this node also serves: signature-checked deposits carry a ✓ and a key fingerprint; typed names stay visibly claims. (<code>/text</code> and <code>/attributed-text</code> answer the same page.)</li>
+  <li><a href="/api/deposits?node_key=key:hello-world">GET /api/deposits?node_key=…</a> — what one key deposited, with the same verified truth as the export.</li>
   <li>Emit shape: <code>POST /api/emit</code> with <code>{op:"emit", node_key, kind:"session-log", payload:{text, provenance:{origin:"authored"}}}</code>; replay-safe (same bytes re-ack the original receipt).</li>
 </ul>
 

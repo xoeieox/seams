@@ -36,6 +36,46 @@
   };
   const short = (t) => (t.length > 220 ? t.slice(0, 100) + ' … ' + t.slice(-100) : t);
 
+  // KEYS demo (EOM-KEYS-2026-10-28): verified ✓ + fingerprint come from ONE source - the export's
+  // creator_verified, true only where the gateway checked an Ed25519 signature at ingest.
+  // Nothing here computes trust: a key:ed25519 author without a checked signature stays a claim,
+  // visibly. The export is public; one short-lived cache keeps the 20 s auto-refresh off the
+  // read budget while the map stays fresh enough for a live demo.
+  let verif = { at: 0, map: null };
+  async function verifMap() {
+    if (verif.map && Date.now() - verif.at < 15000) return verif.map;
+    try {
+      const x = await api('/api/export');
+      const m = new Map();
+      for (const e of (x.entries || [])) {
+        const ref = e.creator_ref;
+        if (typeof ref !== 'string' || !ref.startsWith('key:ed25519:')) continue;
+        if (e.creator_verified === true) m.set(ref, { verified: true, fp: e.node_key_fingerprint || ref.slice(12, 20) });
+        else if (!m.has(ref)) m.set(ref, { verified: false, fp: ref.slice(12, 20) });
+      }
+      verif = { at: Date.now(), map: m };
+    } catch { /* offline/paused: keep the last map, badges degrade honestly to claim */ }
+    return verif.map;
+  }
+  const isEdKey = (n) => typeof n === 'string' && n.startsWith('key:ed25519:');
+  function verifyBadge(name, map) {
+    if (!isEdKey(name)) return null;
+    const rec = map && map.get(name);
+    if (rec && rec.verified) {
+      const b = el('span', 'vbadge', '✓ verified · ' + rec.fp);
+      b.title = 'creator_verified true: the gateway checked this key\u2019s Ed25519 signature at ingest (REQ-SIGN). The fingerprint is the first 8 chars of the public key.';
+      return b;
+    }
+    const b = el('span', 'claimtag', 'claim');
+    b.title = 'A key was used but no signature was verified at ingest - this attribution is a claim, not a check.';
+    return b;
+  }
+  function verifWord(name, map) {
+    if (!isEdKey(name)) return '';
+    const rec = map && map.get(name);
+    return rec && rec.verified ? ' ✓ verified · ' + rec.fp : ' · claim';
+  }
+
   // Render segments as spans. opts.color: tint by author. opts.only: highlight just this author name.
   function textBlock(segs, authors, opts = {}) {
     const box = el('p', 'text' + (opts.color ? ' color' : '') + (opts.only ? ' dim' : ''));
@@ -49,7 +89,7 @@
       const tip = el('div', 'who ui'); tip.hidden = true;
       const show = (e) => {
         const s = e.target.closest('.seg'); if (!s) { tip.hidden = true; return; }
-        tip.textContent = `“${short(s.textContent.trim() || s.textContent)}” — ${s.dataset.who}, added in version ${s.dataset.v}`;
+        tip.textContent = `“${short(s.textContent.trim() || s.textContent)}” — ${s.dataset.who}${verifWord(s.dataset.who, verif.map)}, added in version ${s.dataset.v}`;
         tip.hidden = false;
       };
       box.addEventListener('click', show);
@@ -75,8 +115,9 @@
 
   // ---------- views ----------
   async function viewMain() {
-    await refresh();
+    const map = await verifMap(); await refresh();
     const meta = el('p', 'meta ui', `Version ${state.v} · ${state.kind === 'revert' ? 'restored by admin' : 'last changed by ' + state.name}, ${ago(state.ts)}`);
+    const mb = verifyBadge(state.name, map); if (mb) meta.append(' ', mb);
     const bar = el('div', 'bar ui');
     const color = btn('Colour by author', () => { colorOn = !colorOn; store.set('color', colorOn ? '1' : '0'); render(); });
     color.setAttribute('aria-pressed', String(colorOn));
@@ -122,16 +163,17 @@
   }
 
   async function viewNames() {
-    await refresh();
+    const map = await verifMap(); await refresh();
     const ul = el('ul', 'list ui');
     for (const a of state.authors) {
       const li = el('li'); const link = el('a'); link.href = '#/a/' + encodeURIComponent(a.name);
       link.append(el('span', `dot a${a.idx % NCOLORS}`), el('span', '', a.name),
         el('span', 'sub', `${a.edits} edit${a.edits === 1 ? '' : 's'} · ${a.words} word${a.words === 1 ? '' : 's'} left`));
+      const vb = verifyBadge(a.name, map); if (vb) { vb.style.marginLeft = '.5rem'; link.append(vb); }
       li.append(link); ul.append(li);
     }
     mount(nav('#/', '← Back'), el('h2', '', 'Everyone who has changed this'),
-      el('p', 'meta ui', 'Tap a name to see what they wrote, deleted and replaced. Names are typed, so anyone could be anyone.'), ul);
+      el('p', 'meta ui', 'Tap a name to see what they wrote, deleted and replaced. Typed names stay claims; a key:ed25519 name earns its ✓ only where the gateway checked that key\u2019s signature at ingest.'), ul);
   }
 
   function chips(segs, authors, strike) {
@@ -148,8 +190,10 @@
   };
 
   async function viewAuthor(name) {
+    const map = await verifMap();
     const l = await api('/api/author/' + encodeURIComponent(name));
     const a = l.author, head = el('h2', '', ''); head.append(el('span', `dot a${a.idx % NCOLORS}`), ' ' + a.name);
+    const vb = verifyBadge(a.name, map); if (vb) { vb.style.marginLeft = '.5rem'; head.append(vb); }
     const parts = [nav('#/names', '← Names'), head,
       el('p', 'meta ui', `${a.edits} edit${a.edits === 1 ? '' : 's'}, ${a.words} of their words are still in the text. Highlighted below.`),
       withTip(textBlock(l.segs, l.authors, { only: a.name }))];
@@ -200,7 +244,7 @@
       p('This page is a small demonstration of recording who wrote what, which is the attribution part of the Seams protocol. Consent here is simple: anyone may change the text, and nobody is paid.'),
       p('How authorship is worked out: each save is compared word by word with the version before it. Words you keep stay with whoever wrote them; words you type are yours.'),
       el('h2', '', 'Gaps compared with the real protocol'),
-      p('Names are typed and not verified, so anyone can use anyone’s name. There are no signatures or accounts. If you retype or move someone else’s words, the diff sees new words and credits you. Very small edits can be credited oddly.'),
+      p('Typed names are not verified, so anyone can use anyone\u2019s name - those entries are claims and stay claims. Real identity work is keys: an author can mint an Ed25519 key (key:ed25519:...) and sign their deposit, and the gateway checks that signature at ingest; signature-checked entries carry a \u2713 and a key fingerprint, verified nowhere else, by anyone else, ever. There are no accounts. If you retype or move someone else\u2019s words, the diff sees new words and credits you. Very small edits can be credited oddly.'),
       p('Every save is logged and nothing is deleted. An admin can restore an earlier version, which is itself logged. Saves are rate limited.'),
       (() => { const q = el('p', 'ui'); const a = el('a', '', 'Download the full log (JSON)'); a.href = '/api/export'; q.append(a); return q; })());
   }
