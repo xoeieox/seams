@@ -15,7 +15,7 @@ b8b10df73581c2621f4ebf545f18e9a866ba94a116d5b4a576a84f766dc0c6e2  eom/node-one/a
 f868f1b637dbc915b8a297a5b2997f295cb13f3ad8baf9da39551048dded858d  eom/node-one/attributed-text/server.mjs
 d496aacd0ce2d9bbb4b72ccfd219012167cedde6ab2658e9d2363b4753287cfc  eom/node-one/attributed-text/test/eom.test.mjs
 38fe7a33678680e72f2186cb18bdff8e2751852bd7919f2f9e31cc7fce55696d  eom/node-one/attributed-text/public/landing.html
-078b07ca03ceea060c121f6a59e3bbc4a8536c06a14a82757db547248b804cba  eom/node-one/attributed-text/public/app.js
+13858e893b44f1b1f41938528088fa9dbd3e9e3ff096057b1e85c7aa3da3db40  eom/node-one/attributed-text/public/app.js
 a893ddd620738e89904f347ea7963e0de765bdf859f90899b23d586f6c3bacc1  eom/launcher/server.mjs
 9bfb193d1fc42037d5475583aac8d10e172fc580cbd6ab2c5a4c63c9b9f7ab37  eom/launcher/launcher-core.mjs
 9c95d5e35c5fc9e52473a471b32a5fcb73e5f989f21468791d1ee7c6101fc4b6  eom/launcher/public/app.js
