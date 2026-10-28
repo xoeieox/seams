@@ -15,7 +15,7 @@
 # No reverse proxy in front of or behind the connector; forwarded headers stay unread.
 
 tunnel: <TUNNEL-UUID>
-credentials-file: /home/jellyfish/.cloudflared/<TUNNEL-UUID>.json   # 0600, out-of-tree, never committed
+credentials-file: /home/OPERATOR/.cloudflared/<TUNNEL-UUID>.json   # 0600, out-of-tree, never committed
 
 ingress:
   # the protocol surface (the ONLY public routes; both answer from the node-one origin)
@@ -26,8 +26,8 @@ ingress:
     path: ^/api/export$
     service: http://127.0.0.1:18080
   - hostname: seams.fyi
-    path: ^/api/emit$
-    service: http://127.0.0.1:18080
+    path: ^/api/ingest$
+    service: http://127.0.0.1:18080   # the single write entry (op: hello/emit/...); send-hello posts here
   # the protocol landing page, served BY the node at / (honest IS/IS-NOT list; see README)
   - hostname: seams.fyi
     path: ^/$

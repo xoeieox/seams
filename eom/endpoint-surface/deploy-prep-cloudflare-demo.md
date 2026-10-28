@@ -28,7 +28,7 @@ Consequences, stated as requirements:
   (Verified 2026-10-26; the "likely stays loopback" guess is confirmed.)
 - **The public origin is a DEDICATED PORT (F1, Erah mission 2026-10-28).** cloudflared
   ingress points at `http://127.0.0.1:18080` and **nowhere else**. Port 8080 is NOT the
-  tunnel origin: on this box `100.100.52.102:8080` is already held by dock-proxy/
+  tunnel origin: on this box `<BRIX-TAILSCALE-IP>:8080` is already held by dock-proxy/
   qBittorrent's interface-address binding, and day-to-day node-one stays on
   `127.0.0.1:8080` untouched. The demo-window public instance is a separate boot:
   `NODE_ONE_PORT=18080 node ../launcher/launch.mjs`. Every ingress line in
@@ -189,13 +189,13 @@ from the dashboard.
   the dashboard's apt-install snippet deliberately NOT run (would have replaced the pinned,
   cmp-verified binary e1bc0cf0...).
 - **Origin (F1 dedicated port):** demo node-one pid 2833054,
-  `/data/git/seams-working/eom/node-one/attributed-text/server.mjs`, env-verified
+  `/REPO/eom/node-one/attributed-text/server.mjs`, env-verified
   `NODE_ONE_PORT=18080 NODE_ONE_DATA_DIR=/var/tmp/eom-demo/n1` (out-of-tree), boot 10:10:33
   via the launcher; `ss` shows `127.0.0.1:18080` LISTEN loopback-ONLY. No re-boot needed.
   Loopback `/api/hello` answers the node-one wire JSON; `/` 200 with the "What this node is
   not" landing; `/api/export` 200.
 - **Token:** used exactly once. Stored 0600 out-of-tree at
-  `/home/jellyfish/.cloudflared/dashboard-token` (184 bytes, jellyfish:jellyfish). The
+  `/home/OPERATOR/.cloudflared/dashboard-token` (184 bytes, OPERATOR:OPERATOR). The
   literal crossed chat->0600-file once and was NEVER echoed into any log, report, git
   object, or room. It never entered cloudflared's argv: the unit passes
   `--token-file ~/.cloudflared/dashboard-token` (accepted-process-args exposure eliminated
@@ -204,8 +204,8 @@ from the dashboard.
   `~/.config/systemd/user/cloudflared-seams.service` (new; enabled; WantedBy=default.target;
   Restart=on-failure RestartSec=5; StartLimitIntervalSec=0 - aci-serve trio convention;
   linger=yes), ExecStart
-  `/usr/local/bin/cloudflared tunnel --no-autoupdate run --token-file /home/jellyfish/.cloudflared/dashboard-token`.
-  Log path: `/home/jellyfish/logs/cloudflared-seams.log` (append; journal: `journalctl --user -u cloudflared-seams`).
+  `/usr/local/bin/cloudflared tunnel --no-autoupdate run --token-file /home/OPERATOR/.cloudflared/dashboard-token`.
+  Log path: `/home/OPERATOR/logs/cloudflared-seams.log` (append; journal: `journalctl --user -u cloudflared-seams`).
   MainPID 3052698 (start 11:01:12 PDT after one arg-order fix: `--no-autoupdate` is a
   `tunnel`-level flag, must precede `run`); log shows precheck all-pass and 4x "Registered
   tunnel connection" (lax12/san01, quic).
@@ -236,7 +236,7 @@ from the dashboard.
   Then run: `verify-tunnel-fingerprint.sh` (MUST PASS) + landing 200 + `/api/export` 200 +
   public `/api/hello` node-one wire read.
 - **qBittorrent shapes: ZERO.** The 525 is the Cloudflare edge's OWN error page (never
-  served from BRIX); the docker-proxy/qBittorrent shape at `100.100.52.102:8080` was never
+  served from BRIX); the docker-proxy/qBittorrent shape at `<BRIX-TAILSCALE-IP>:8080` was never
   in this path (ingress is 18080-only by ruling and by config), and the negative guard
   stays in the verify script. Teardown trigger NOT fired - nothing wrong-shaped was ever
   publicly served.
