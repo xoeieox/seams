@@ -121,7 +121,7 @@
     const bar = el('div', 'bar ui');
     const color = btn('Colour by author', () => { colorOn = !colorOn; store.set('color', colorOn ? '1' : '0'); render(); });
     color.setAttribute('aria-pressed', String(colorOn));
-    bar.append(btn('Edit', () => { location.hash = '#/edit'; }, 'primary'), color, linkBtn(`Names (${state.authors.length})`, '#/names'), linkBtn('History', '#/history'));
+    bar.append(btn('Edit', () => { location.hash = '#/edit'; }, 'primary'), color, linkBtn('Keys', '#/keys'), linkBtn(`Names (${state.authors.length})`, '#/names'), linkBtn('History', '#/history'));
     mount(withTip(textBlock(state.segs, state.authors, { color: colorOn })), meta, bar, foot());
   }
 
@@ -249,6 +249,120 @@
       (() => { const q = el('p', 'ui'); const a = el('a', '', 'Download the full log (JSON)'); a.href = '/api/export'; q.append(a); return q; })());
   }
 
+  // ---------- KEYS: the outside visitor's own key (EOM-KEYS-2026-10-28, owner GO xErah) ----------
+  // The browser is the custody: WebCrypto mints a real Ed25519 pair, the private half stays in
+  // this origin's localStorage (and in the file only YOU download), and the gateway's own reply
+  // is the only source of a verified badge - nothing on this page computes trust. The canonical
+  // bytes below MUST equal canonicalSigningBytes in keys.mjs: same rule, duplicated by design
+  // (sorted keys, no whitespace, JSON scalars); the conformance suite pins the node side.
+  const KEYFILE = 'seam…e-v1';
+  const canon = (v) =>
+    v === null || v === undefined || typeof v !== 'object' ? JSON.stringify(v ?? null)
+      : Array.isArray(v) ? '[' + v.map(canon).join(',') + ']'
+        : '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + canon(v[k])).join(',') + '}';
+  const toB64 = (buf) => { let s = ''; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); };
+  const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const PRIV_PKCS8_PREFIX = Uint8Array.from('302e020100300506032b657004220420'.match(/../g).map((h) => parseInt(h, 16)));
+  async function edSupported() {
+    try { const k = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']); return !!(k && k.privateKey); } catch { return false; }
+  }
+  async function myKey() {
+    const raw = store.get(KEYFILE);
+    if (!raw) return null;
+    try {
+      const kf = JSON.parse(raw);
+      if (!kf || kf.v !== 1 || !/^key:ed25519:[A-Za-z0-9+/]{43}=$/.test(String(kf.node_key || '')) || typeof kf.priv_b64 !== 'string') return null;
+      const seed = fromB64(kf.priv_b64);
+      if (seed.length !== 32) return null;
+      const der = new Uint8Array(PRIV_PKCS8_PREFIX.length + 32); der.set(PRIV_PKCS8_PREFIX); der.set(seed, PRIV_PKCS8_PREFIX.length);
+      const priv = await crypto.subtle.importKey('pkcs8', der, 'Ed25519', false, ['sign']);
+      return { nodeKey: kf.node_key, priv, fileText: raw };
+    } catch { return null; }
+  }
+  async function mintKey() {
+    const pair = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+    const pubRaw = await crypto.subtle.exportKey('raw', pair.publicKey);
+    const der = await crypto.subtle.exportKey('pkcs8', pair.privateKey);
+    const derU = new Uint8Array(der);
+    const kf = { v: 1, node_key: 'key:ed25519:' + toB64(pubRaw), priv_b64: toB64(derU.subarray(derU.length - 32)) };
+    store.set(KEYFILE, JSON.stringify(kf));
+    return kf;
+  }
+  async function signWith(priv, body) { return toB64(await crypto.subtle.sign('Ed25519', priv, new TextEncoder().encode(canon(body)))); }
+
+  async function viewKeys() {
+    const head = [nav('#/', '← Back'), el('h2', '', 'Your key')];
+    if (!(await edSupported())) {
+      mount(...head, el('p', 'notice err ui', 'This browser has no WebCrypto Ed25519 - try a current Chrome, Safari, or Firefox. Nothing was minted.'));
+      return;
+    }
+    if (!store.get(KEYFILE)) {
+      mount(...head,
+        el('p', 'ui', 'A key is an identity the gateway can CHECK, not a name it trusts. Mint a real Ed25519 keypair in this browser: the private half stays here (plus a file only you download), the gateway verifies your signature at ingest, and a checked deposit carries \u2713 verified - verified at that moment, for those bytes, nothing more. No accounts, no recovery: lose the key, lose the name.'),
+        (() => { const r = el('div', 'bar ui'); r.append(btn('Mint my key', async () => {
+          try { await mintKey(); render(); } catch (e) { mount(...head, el('p', 'notice err ui', 'Mint failed: ' + e.message)); }
+        }, 'primary')); return r; })());
+      return;
+    }
+    let kf;
+    try { kf = JSON.parse(store.get(KEYFILE)); } catch { store.set(KEYFILE, ''); render(); return; }
+    const mine = await myKey();
+    if (!mine) {
+      const redo = (() => { const r = el('div', 'bar ui'); r.append(btn('Mint a new key', async () => { store.set(KEYFILE, ''); await mintKey(); render(); }, 'primary')); return r; })();
+      mount(...head, el('p', 'notice err ui', 'The stored key file failed its own checks (shape, or private half not matching the public half). Nothing sends with a broken key - mint a new one.'), redo, foot());
+      return;
+    }
+    const fp = kf.node_key.slice(12, 20);
+    let status = null;
+    try { status = await api('/api/deposits?node_key=' + encodeURIComponent(kf.node_key)); } catch { /* gateway quiet: stay honest, never assume */ }
+    const keyLine = el('p', 'meta ui', kf.node_key.slice(0, 24) + '\u2026' + kf.node_key.slice(-6) + ' \u00b7 fingerprint ' + fp);
+    const statusLine = el('p', 'meta ui', status === null ? 'Gateway status unknown right now - nothing is assumed.'
+      : status.registered ? `Registered with the gateway \u00b7 ${status.count} deposit${status.count === 1 ? '' : 's'} \u00b7 registry verified: ${status.registry && status.registry.verified ? '\u2713 true' : 'false (claim)'}`
+        : 'Not registered yet - announce it (below) to turn your key into a registered identity.');
+    const who = el('input'); who.maxLength = 40; who.placeholder = 'Name to register (optional)'; who.value = store.get('name') || '';
+    const out = el('div');
+    const say = (t, err) => { out.replaceChildren(el('p', 'notice' + (err ? ' err' : '') + ' ui', t)); };
+    const sendBtn = btn('Announce (register)', async () => {
+      sendBtn.disabled = true;
+      try {
+        const body = { op: 'emit', kind: 'node-key', node_key: kf.node_key };
+        if (who.value.trim()) body.provenance = { attributed_to: { name: who.value.trim() } };
+        body.sig = await signWith(mine.priv, body);
+        const r = await post('/api/ingest', body);
+        say('Gateway answer: ' + (r.status === 'deposited' ? 'deposited' : r.status) + (r.duplicate ? ' (replay of the same announce)' : '') + ' \u00b7 verified: ' + (r.verified === true ? '\u2713 true - the gateway checked your signature against your key' : 'false (claim)') + ' \u00b7 receipt ' + r.receipt);
+        statusLine.textContent = 'Registered with the gateway \u00b7 registry verified: ' + (r.verified === true ? '\u2713 true' : 'false (claim)');
+      } catch (e) { say(e.message, true); }
+      sendBtn.disabled = false;
+    }, 'primary');
+    const hello = el('input'); hello.maxLength = 200; hello.placeholder = 'Say something, signed';
+    const helloBtn = btn('Sign my first deposit', async () => {
+      helloBtn.disabled = true;
+      try {
+        const t = hello.value.trim();
+        if (!t) { say('Type something first.', true); helloBtn.disabled = false; return; }
+        const body = { op: 'emit', kind: 'session-log', node_key: kf.node_key, text: t, provenance: { origin: 'authored' } };
+        body.sig = await signWith(mine.priv, body);
+        const r = await post('/api/ingest', body);
+        say(r.status === 'deposited' ? `Deposited v${r.v} \u00b7 creator_verified: ${r.creator_verified === true ? '\u2713 true' : 'false (claim)'} \u00b7 fingerprint ${r.node_key_fingerprint || 'none'} \u00b7 receipt ${r.receipt}${r.duplicate ? ' (replay: identical bytes were already in the log)' : ''}` : 'Answer: ' + JSON.stringify(r));
+      } catch (e) { say((e.body && e.body.message) || e.message, true); }
+      helloBtn.disabled = false;
+    });
+    const dl = el('a', 'btn', 'Download key file');
+    dl.href = URL.createObjectURL(new Blob([mine.fileText], { type: 'application/json' }));
+    dl.download = 'seams-node-key-' + fp + '.json';
+    const bar = el('div', 'bar ui');
+    bar.append(sendBtn, dl, btn('Forget on this device', () => {
+      if (confirm('Forget this key on this device? The log keeps what it deposited - the key cannot be recovered, and neither can the name.')) { store.set(KEYFILE, ''); render(); }
+    }));
+    mount(...head,
+      el('p', 'ui', 'This is YOUR key: generated here, held here. The private half leaves only through the download, and signatures are the only thing it ever produces.'),
+      keyLine, statusLine,
+      el('label', 'ui', 'Register (announce is self-signed; signing it is what proves you hold the private half).'), who, bar, out,
+      el('label', 'ui', 'Signed deposit (the gateway checks it at its gate - a bad signature deposits nothing).'), hello,
+      (() => { const r = el('div', 'bar ui'); r.append(helloBtn); return r; })(),
+      foot());
+  }
+
   function viewAdmin() {
     const i = el('input'); i.placeholder = 'Admin token'; i.type = 'password'; i.value = store.get('admin') || '';
     mount(nav('#/', '← Back'), el('h2', '', 'Admin'), el('p', 'ui', 'Paste the token to see “Restore this version” on old versions.'), i,
@@ -266,6 +380,7 @@
       else if (h === '/names') await viewNames();
       else if (h === '/history') await viewHistory();
       else if (h === '/about') viewAbout();
+      else if (h === '/keys') await viewKeys();
       else if (h === '/admin') viewAdmin();
       else if ((m = h.match(/^\/a\/(.+)$/))) await viewAuthor(decodeURIComponent(m[1]));
       else if ((m = h.match(/^\/v\/(\d+)$/))) await viewVersion(Number(m[1]));
