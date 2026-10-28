@@ -20,4 +20,5 @@ Captured from the design review, 2026-10-26. Design direction: **2a** (tall wind
 - Can the launcher detect locally installed agent tools (Claude Code, Codex, Claude desktop), or should it only ask? Default: ask. Don't probe.
 - Endpoint route: where do the credentials live? (They must stay out of the attribution log and the node registry.)
 - Should queued tasks expire or re-escalate, the way declarations do?
-- Launcher must-nevers still apply to anything handed off: no payments, no claims/vouches, no verified:true, fork/remix stays 501.
+- Launcher must-nevers still apply to anything handed off: no payments, no claims/vouches, no verified:true, fork/remix stays 501. (The `verified:true` rail bars launcher-authored labels only; the gateway's machine-made `creator_verified` is the ruling's meaning, verbatim - see `seams-launcher-spec.md`, C9/EOM-DEMO-UI-FIXWAVE-2026-10-28:
+  > RULING (xErah, 2026-10-28, GO "Yes let's get these changes worked in" 13:37 PDT): creator_verified=true means the gateway verified an Ed25519 signature over the canonical body, by a registered key, at ingest - proof of key control, nothing more. It is NOT identity, NOT a vouch, and NOT consent; unsigned entries stay honestly labeled claims. No vouch layer, no identity claims, no payments enter through this surface.)

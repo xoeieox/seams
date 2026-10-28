@@ -222,7 +222,10 @@ Sub-tabs: **To hand off · N** | **Handed off · N** | **Route**.
 - **+ Queue for agent** buttons sit on every issue. Once queued, the label changes to "✓ Queued". Items are de-duplicated by title.
 - **Refusals** always show the server's name verbatim.
 - **Fork/remix** is always shown as "not yet built", never as an error.
-- No payments, claims, vouches or verified:true attributions.
+- No payments, claims, vouches or verified:true attributions. (Launcher-side authorship rails;
+  the gateway's own machine-made `creator_verified` is displayed verbatim from export - the C9
+  ruling, verbatim, EOM-DEMO-UI-FIXWAVE-2026-10-28:
+  > RULING (xErah, 2026-10-28, GO "Yes let's get these changes worked in" 13:37 PDT): creator_verified=true means the gateway verified an Ed25519 signature over the canonical body, by a registered key, at ingest - proof of key control, nothing more. It is NOT identity, NOT a vouch, and NOT consent; unsigned entries stay honestly labeled claims. No vouch layer, no identity claims, no payments enter through this surface.)
 - **No exposure UI:** exposure is blocked-on-ruling.
 - **Motion:** none. No transitions or animation.
 

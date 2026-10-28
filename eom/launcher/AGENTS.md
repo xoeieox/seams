@@ -24,6 +24,10 @@ If you can read a file on this machine, you know what to do and do it — withou
 - `verified` belongs to machinery alone — a fresh conform run on the launcher, a hello/export
   result. NEVER write `verified:true`, never label your own ack verified, never touch status
   lines of tasks you did not run. An ack is asserted forever until a machine run says otherwise.
+  This rail is about what YOU may author - it never suppressed the gateway's own machine-made
+  `creator_verified` arriving verbatim in export bytes. Its meaning is the recorded ruling
+  (constraint C9, EOM-DEMO-UI-FIXWAVE-2026-10-28), verbatim:
+  > RULING (xErah, 2026-10-28, GO "Yes let's get these changes worked in" 13:37 PDT): creator_verified=true means the gateway verified an Ed25519 signature over the canonical body, by a registered key, at ingest - proof of key control, nothing more. It is NOT identity, NOT a vouch, and NOT consent; unsigned entries stay honestly labeled claims. No vouch layer, no identity claims, no payments enter through this surface.
 
 ## Where the truth lives in this packet
 - `README.md` — the human's setup path; `node launch.mjs` is the one command (starts node-one and
@@ -40,7 +44,9 @@ If you can read a file on this machine, you know what to do and do it — withou
   external — no external calls at all. Exposure is blocked-on-ruling and there is deliberately
   no exposure UI to configure.
 - **No money, no claims.** No payments surface (compensation is `none` in the wire's terms); no
-  claims/vouches; `verified:true` attribution is never displayed; fork/remix stays 501
+  claims/vouches; `verified:true` attribution is never displayed (by the launcher - the gateway's
+  machine-made `creator_verified` rides export verbatim; see the C9 ruling quoted in the honesty
+  labels section above); fork/remix stays 501
   (`consent_gate_unbuilt`) — built-later, not broken, so never "fix" it by wiring consent.
 - **Zero dependencies.** Never `npm install` into the packet; everything runs on bare node.
   (Dev-only exception: the Tauri icon/build flow via the package.json scripts.)

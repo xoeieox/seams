@@ -75,5 +75,11 @@ A small window with controls, text fields and checklists: an honest tool-era win
 - No payments.
 - No claims or vouch surfaces.
 - No verified:true attributions.
+  - Launcher-side rails stand exactly as written: this forbids the launcher (or any agent in
+    it) from ever fabricating or flipping a `verified:true` attribution. It never barred the
+    gateway's own machine-made `creator_verified`, displayed verbatim from the export. The
+    pre-keys reading was stale (keeper grounding report, constraint C9); the ruling that
+    crossed it, verbatim and attributed (EOM-DEMO-UI-FIXWAVE-2026-10-28):
+    > RULING (xErah, 2026-10-28, GO "Yes let's get these changes worked in" 13:37 PDT): creator_verified=true means the gateway verified an Ed25519 signature over the canonical body, by a registered key, at ingest - proof of key control, nothing more. It is NOT identity, NOT a vouch, and NOT consent; unsigned entries stay honestly labeled claims. No vouch layer, no identity claims, no payments enter through this surface.
 - Fork and remix paths show as built-later (501), not as broken.
 - Exposure posture (bind/TLS/proxy) is intentionally blocked-on-ruling. The launcher doesn't design for a public deployment yet; it designs the local truth.

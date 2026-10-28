@@ -198,7 +198,10 @@ override what the bundle packs.
 
 - No payments surface anywhere (compensation is `none` in the wire's terms).
 - No claims/vouches surface; `verified:true` attribution is never displayed —
-  Baseline shows `creator_verified: false` as what it is.
+  Baseline shows `creator_verified: false` as what it is — and a gateway-checked row shows
+  `creator_verified: true` as what it is, verbatim from the gateway's own export, never
+  launcher-made (constraint C9 ruling, verbatim, EOM-DEMO-UI-FIXWAVE-2026-10-28):
+  > RULING (xErah, 2026-10-28, GO "Yes let's get these changes worked in" 13:37 PDT): creator_verified=true means the gateway verified an Ed25519 signature over the canonical body, by a registered key, at ingest - proof of key control, nothing more. It is NOT identity, NOT a vouch, and NOT consent; unsigned entries stay honestly labeled claims. No vouch layer, no identity claims, no payments enter through this surface.
 - Fork/remix: disabled control + built-later copy; server-side `consent_gate_unbuilt` 501.
 - No exposure/tunnel UI: the footer states `exposure: blocked-on-ruling`; the
   server refuses non-loopback binds outright.
