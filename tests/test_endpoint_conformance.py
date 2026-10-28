@@ -27,6 +27,7 @@ one tagged test, so the suite cannot silently drift from the spec; a spec edit
 that drops a REQ line makes the table test fail here, not quietly pass.
 """
 
+import base64
 import json
 import os
 import re
@@ -37,6 +38,7 @@ import tempfile
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
@@ -296,12 +298,13 @@ def tampered_target(**env):
 def test_requirements_tables_intact():
     assert SPEC_REQ_IDS == {
         f"REQ-HELLO-{i}" for i in range(1, 5)
-    } | {f"REQ-EMIT-{i}" for i in range(1, 10)} | {f"REQ-EXPORT-{i}" for i in range(1, 6)}, SPEC_REQ_IDS
+    } | {f"REQ-EMIT-{i}" for i in range(1, 10)} | {f"REQ-EXPORT-{i}" for i in range(1, 6)} \
+        | {f"REQ-SIGN-{i}" for i in range(1, 7)} | {f"REQ-DEP-{i}" for i in range(1, 4)}, SPEC_REQ_IDS   # KEYS pass 2026-10-28: signing + deposits-view rules enter the pinned table
     assert SPEC_REFUSALS == {
         "unknown_kind": 400, "unknown_op": 400, "bad_node_key": 400,
         "consent_gate_unbuilt": 501, "parents_on_original": 400, "bad_origin": 400,
         "already_deposited": 409, "empty": 400, "too_long": 413, "too_big": 413,
-        "bad_content": 400,
+        "bad_content": 400, "bad_signature": 400,                      # REQ-SIGN-3: refused AT THE GATE
     }, SPEC_REFUSALS
     assert ACCEPT_KINDS == ["node-key", "session-log"]
     assert (MAP_TEXT, MAP_PAGE) == ("session-log", "session-log")
@@ -420,6 +423,9 @@ def test_emit_refusal_table_every_named_refusal_actually_fires():
             payload = {**payload, "op": "record"}
         elif code == "bad_node_key":
             payload["node_key"] = "key:!!"
+        elif code == "bad_signature":               # KEYS pass (REQ-SIGN-3): present-but-garbage sig, refused AT THE GATE
+            payload["node_key"] = "key:ed25519:" + "A" * 43 + "="
+            payload["sig"] = "not-base64!!"
         elif code == "consent_gate_unbuilt":
             payload["derivation"] = "fork"
         elif code == "parents_on_original":
@@ -515,7 +521,9 @@ def test_node_key_well_formed_required_and_the_registry_holds_no_ips():
         _, _, x = jget(t.base, "/api/export")
         reg = [n for n in x["nodes"] if n["node_key"] == "key:probe-reg"]
         assert reg, "announce must register the key"
-        assert set(reg[0]) == {"node_key", "who", "first_seen", "seen"}, reg[0]
+        assert set(reg[0]) == {"node_key", "who", "first_seen", "seen", "verified", "node_key_fingerprint"}, reg[0]
+        assert reg[0]["verified"] is False, "a ref-key announce registers as a claim; verified comes only from a verified Ed25519 sig (REQ-SIGN-4)"
+        assert reg[0]["node_key_fingerprint"] is None, "REQ-SIGN-5: fingerprint is null for non-ed25519 keys"
         assert reg[0]["who"] == "Reg Probe"
         assert not IPV4_RE.search(json.dumps(reg)), "REQ-EMIT-4: the registry stores no IPs, ever"
         assert not IPV4_RE.search(json.dumps(stt)), "REQ-EMIT-4: the public state exposes no IPs"
@@ -714,11 +722,12 @@ def test_export_honesty_labels_and_public_by_ruling():
         st, _, raw_bogus = _http("GET", t.base, "/api/export", headers={"authorization": "Bearer not-a-token"})
         assert raw_bogus == raw_plain, "export consults no token - the only refusal that stands is log_integrity"
         for e in x["entries"]:
-            assert e["creator_verified"] is False, "REQ-EXPORT-5: no identity claims until the keys ruling lands"
+            assert e["creator_verified"] is False, "REQ-EXPORT-5 + REQ-SIGN-4: every entry here is an unsigned or ref-keyed claim - the badge is machine-made at the gate, never from a typed name"
             for f in ("content_hash", "deposit_hash"):
                 assert HASH_RE.match(e[f]), (f, e[f])
         for n in x["nodes"]:
-            assert set(n) == {"node_key", "who", "first_seen", "seen"} and not IPV4_RE.search(json.dumps(n))
+            assert set(n) == {"node_key", "who", "first_seen", "seen", "verified", "node_key_fingerprint"} and not IPV4_RE.search(json.dumps(n))
+            assert n["verified"] is False, "ref keys register as claims; verified=true only ever comes from a verified Ed25519 signature (REQ-SIGN-4)"
     finally:
         t.stop()
 
@@ -928,6 +937,139 @@ def test_f4_bind_rail_nonloopboot_refused_unless_hatch_named_verbatim():
     finally:
         node2.kill()
         node2.wait(timeout=5)
+
+
+# ---------------------------------------------------------------------------
+# KEYS pass (EOM-KEYS-2026-10-28): REQ-SIGN - real Ed25519 node keys, verified at the gate.
+# Signing happens through a node subprocess importing the shipped keys.mjs itself, so the
+# conformance suite checks the SAME canonicalization the gateway verifies against - if the
+# two ever drift, this section goes red, not green.
+# ---------------------------------------------------------------------------
+
+KEYS_MJS = REPO / "eom" / "node-one" / "attributed-text" / "keys.mjs"
+
+
+def _node_run(src, stdin=""):
+    p = subprocess.run([shutil.which("node") or "node", "--input-type=module", "-e", src, str(KEYS_MJS)],
+                       input=stdin, capture_output=True, text=True, timeout=20)
+    assert p.returncode == 0, p.stderr
+    return p.stdout
+
+
+def keys_mint():
+    out = _node_run("import {pathToFileURL} from 'node:url';"
+                    "const K = await import(pathToFileURL(process.argv[1]).href);"
+                    "process.stdout.write(JSON.stringify(K.generateKeyPair()));")
+    return json.loads(out)                        # {nodeKey, pubB64, privB64}
+
+
+def keys_sign(priv_b64, body):
+    return _node_run("import {pathToFileURL} from 'node:url';"
+                     "const K = await import(pathToFileURL(process.argv[1]).href);"
+                     "let s = ''; for await (const c of process.stdin) s += c;"
+                     "const { priv, body } = JSON.parse(s);"
+                     "process.stdout.write(K.signBody(priv, body));",
+                     stdin=json.dumps({"priv": priv_b64, "body": body}))
+
+
+def signed(body, pair):
+    b = dict(body)
+    b.pop("sig", None)
+    b["sig"] = keys_sign(pair["privB64"], b)
+    return b
+
+
+def announce_body(key, name):
+    return {"op": "emit", "kind": "node-key", "node_key": key,
+            "provenance": {"attributed_to": {"name": name}}}
+
+
+@req("REQ-SIGN-1a", "REQ-SIGN-3")
+def test_ref_key_carrying_a_sig_and_malformed_ed25519_shapes_refuse_at_the_gate():
+    t = TargetNode().start()
+    try:
+        n0 = len(t.log_lines())
+        ref = emit_payload(text=uniq("ref-sig"), node_key="key:probe-ref", sig="AAAA")
+        st, _, r = jpost(t.base, "/api/ingest", ref)
+        assert st == 400 and r["error"] == "bad_signature", (st, r)   # a sig on a ref key is a signature attempt, not a claim
+        bad_shape = emit_payload(text=uniq("shape"), node_key="key:ed25519:" + "A" * 42 + "=")
+        st, _, r = jpost(t.base, "/api/ingest", bad_shape)
+        assert st == 400 and r["error"] == "bad_node_key", (st, r)     # 43 chars + pad or it is not a node key
+        assert len(t.log_lines()) == n0, "gate refusals deposit nothing"
+    finally:
+        t.stop()
+
+
+@req("REQ-SIGN-1", "REQ-SIGN-2", "REQ-SIGN-4", "REQ-SIGN-5")
+def test_signed_emit_verifies_at_the_gate_and_the_badge_is_machine_made():
+    t = TargetNode().start()
+    try:
+        pair = keys_mint()
+        n0 = len(t.log_lines())
+        # (1) signed emit BEFORE any announce: sig verifies but the key is unregistered - honest claim
+        early = signed(emit_payload(node_key=pair["nodeKey"], text=uniq("pre-announce")), pair)
+        st, _, r = jpost(t.base, "/api/ingest", early)
+        assert st == 200 and r["status"] == "deposited", (st, r)
+        assert r["creator_verified"] is False, "REQ-SIGN-4: registration must come first"
+        # (2) the announce itself is signature-verified (self-signed, REQ-SIGN-2)
+        ann = signed(announce_body(pair["nodeKey"], "Signed Probe"), pair)
+        st, _, r = jpost(t.base, "/api/ingest", ann)
+        assert st == 200 and r["status"] == "deposited", (st, r)
+        # (3) wire key order is NOT the signed bytes: rebuild the dict in shuffled order, sign
+        #     the canonical body, post shuffled - the gateway must still verify (REQ-SIGN-1)
+        shuffled = {"text": None, "op": "emit", "sig": None, "kind": "session-log", "node_key": pair["nodeKey"]}
+        base = {"op": "emit", "kind": "session-log", "node_key": pair["nodeKey"], "text": uniq("canonical")}
+        shuffled["text"] = base["text"]
+        shuffled["sig"] = keys_sign(pair["privB64"], base)
+        st, _, r = jpost(t.base, "/api/ingest", shuffled)
+        assert st == 200 and r["status"] == "deposited", (st, r)
+        assert r["creator_verified"] is True, "verified is machine-made: gate-verified sig + registered key"
+        assert r["node_key_fingerprint"] == pair["pubB64"][:8], "REQ-SIGN-5 fingerprint is display-only prefix"
+        # (4) tamper AFTER signing: content-bound refusal, nothing stored, nothing quarantined
+        tampered = dict(shuffled)
+        tampered["text"] = shuffled["text"] + " TAMPERED"
+        st, _, r = jpost(t.base, "/api/ingest", tampered)
+        assert st == 400 and r["error"] == "bad_signature" and r.get("wire") == WIRE, (st, r)
+        _, _, x = jget(t.base, "/api/export")
+        assert x["integrity"]["ok"] is True, "a foreign bad signature never quarantines the log"
+        assert len(t.log_lines()) == n0 + 2, "two signed claims appended; the announce REGISTERS (nodes.jsonl), refusals store nothing"
+        # (5) unsigned re-announce of a verified key never un-verifies it (verified is monotone)
+        st, _, r = jpost(t.base, "/api/ingest", announce_body(pair["nodeKey"], "Signed Probe again"))
+        assert st == 200 and r["status"] == "deposited"
+        _, _, x = jget(t.base, "/api/export")
+        reg = [n for n in x["nodes"] if n["node_key"] == pair["nodeKey"]]
+        assert reg and reg[0]["verified"] is True, "REQ-SIGN-4: verified is monotone in the registry"
+        # (6) a sig from a DIFFERENT key never verifies under this one (content + key binding)
+        other = keys_mint()
+        wrong = signed(announce_body(other["nodeKey"], "Wrong Key"), pair)   # pair signs for other's key
+        st, _, r = jpost(t.base, "/api/ingest", wrong)
+        assert st == 400 and r["error"] == "bad_signature", (st, r)
+    finally:
+        t.stop()
+
+
+@req("REQ-SIGN-6", "REQ-DEP-1", "REQ-DEP-2", "REQ-DEP-3")
+def test_deposits_view_is_keyed_honest_and_carries_no_custody():
+    # REQ-DEP-1: fetched with NO auth header below (public by ruling, rides the read tier, and
+    # rides export's 503 log_integrity refusal since it reads through store.export()).
+    t = TargetNode().start()
+    try:
+        pair = keys_mint()
+        st, _, r = jpost(t.base, "/api/ingest", signed(announce_body(pair["nodeKey"], "Deposits Probe"), pair))
+        assert st == 200 and r["status"] == "deposited"
+        st, _, r = jpost(t.base, "/api/ingest", signed(emit_payload(node_key=pair["nodeKey"], text=uniq("viewed")), pair))
+        assert st == 200 and r["creator_verified"] is True
+        st, _, d = jget(t.base, "/api/deposits?node_key=" + urllib.parse.quote(pair["nodeKey"], safe=""))
+        assert st == 200 and d["count"] >= 1 and d["registered"] is True, (st, d)
+        assert d["registry"]["node_key_fingerprint"] == pair["pubB64"][:8]
+        assert "priv" not in json.dumps(d), "deposits is a public view: it carries no custody material"
+        unknown = "key:ed25519:" + base64.b64encode(os.urandom(32)).decode()
+        st, _, d = jget(t.base, "/api/deposits?node_key=" + urllib.parse.quote(unknown, safe=""))
+        assert st == 200 and d["count"] == 0 and d["registered"] is False, "absence of deposits is an honest answer, not a 404"
+        st, _, d = jget(t.base, "/api/deposits?node_key=" + urllib.parse.quote("key:!!", safe=""))
+        assert st == 400 and d["error"] == "bad_node_key", (st, d)
+    finally:
+        t.stop()
 
 
 # ---------------------------------------------------------------------------
