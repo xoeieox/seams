@@ -122,6 +122,9 @@ join_gate:
       - rule: "node_key_fingerprint is the first 8 characters of the base64 public half (null for non-ed25519 keys); it is display/analytics material only - verification always uses the full embedded key"
       - "id: REQ-SIGN-6"
       - rule: "no ceremony, no custody: keys are disposable, there is no KMS, no revocation list, no vouch chain; what a verified entry proves is control of the private half at ingest time and NOTHING ELSE - not identity, not trust, not permanence (the private key lives outside the repo tree at 0600 with its owner)"
+    reader_side:
+      - "id: REQ-SIGN-7"
+      - rule: "reader-side bytes ship in the export (C2 close, EOM-DEMO-UI-FIXWAVE-2026-10-28): every export entry that deposited a gate-verified signature also carries creator_sig_b64 (the raw 64-byte Ed25519 signature, base64), creator_signed_b64 (the canonical signing bytes it covers, base64 - the REQ-SIGN-1 rule, byte-exact) and creator_pub_b64 (the raw 32-byte public half, base64: the key embedded in node_key/creator_ref, surfaced verbatim); entries without a deposited signature carry honest nulls. Any reader can re-check a deposit locally, forever, with its own implementation (WebCrypto or otherwise) without trusting the gateway - the boolean becomes an honest convenience, not the only check. Verification stays at-ingest on the server; this adds fields and removes none (wire and log format strings hold)"
   rate:
     keying: socket peer address ONLY - cf-connecting-ip / x-forwarded-for are attacker-controlled and never read (T1 lesson, smoke 2026-10-26)
     burn_policy: validation/gate refusals and store rejections do not consume budget; only successful mutations charge (peek/charge split); the same split governs the read tier - 404/429/503 responses charge nothing, successful reads (<400) charge the read bucket only

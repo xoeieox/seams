@@ -53,7 +53,7 @@ The script pins the wire version (`seams-wire/0.3-draft`), checks the A3-style e
 - Limits: 10 saves per 10 min per socket-IP, 80 per 10 min overall, 10 emits per 10 min per socket-IP, 300 reads per 10 min per socket-IP, 1500 reads overall, 8000 characters, 40-character names, 64 KB bodies (`EDIT_LIMIT`, `INGEST_LIMIT`, `GLOBAL_LIMIT`, `READ_LIMIT`, `READ_GLOBAL_LIMIT`, `WINDOW_MS`).
 - Ingest gate (`POST /api/ingest`, `GET /api/hello`): the closed join surface for wire-shaped emits - see `eom/endpoint-surface/requirements.yaml` for the requirements (hello / emit / export, the join gate, and the folded host/exposure ruling of 2026-10-26).
 - Admin revert: adds a new version equal to an old one (original authorship restored), logged like any edit.
-- `/api/export`: the log as JSON, also linked from the About page. **Public by the 2026-10-26 ruling** - the only export refusal is the 503 integrity gate below.
+- `/api/export`: the log as JSON, also linked from the About page. **Public by the 2026-10-26 ruling** - the only export refusal is the 503 integrity gate below. Entries carrying a gate-verified signature also ship the reader's own verification kit - `creator_sig_b64`, `creator_signed_b64`, `creator_pub_b64` (REQ-SIGN-7, C2 close 2026-10-28): the raw Ed25519 signature, the canonical bytes it covers, and the raw public half, so anyone can re-check the signature locally, forever, without trusting the gateway boolean.
 
 ## How authorship works
 

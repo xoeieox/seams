@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { NODE_KEY_ED25519_RE, verifyBodySig, fingerprintOf } from './keys.mjs';
+import { NODE_KEY_ED25519_RE, verifyBodySig, fingerprintOf, canonicalSigningBytes } from './keys.mjs';
 
 export const MAX_TEXT = 8000;
 export const MAX_NAME = 40;
@@ -353,7 +353,13 @@ export class Store {
       // first, then emit - the rule pinned in requirements.yaml). Everything else, signed-but-
       // unregistered included, stays a claim: key_verified false.
       key_verified: keyVerified && this.nodes.has(nodeKey),
-      ...(hasSig ? { sig: String(body.sig) } : {}),
+      ...(hasSig ? { sig: String(body.sig), sig_bytes_b64: canonicalSigningBytes(body).toString('base64') } : {}),
+      // Reader-side bytes (C2 close, EOM-DEMO-UI-FIXWAVE-2026-10-28, REQ-SIGN-7): a deposited
+      // sig ALWAYS verified at the gate (a bad sig never deposits), and the canonical signing
+      // bytes it covers are pinned here byte-exact, so export can hand a reader everything a
+      // local re-check needs - signature, the bytes it signs, and the public half (inside
+      // node_key/creator_ref, surfaced verbatim by export). Verification stays at-ingest;
+      // this is reader material only.
       provenance: { origin: 'ingested', declared_origin: origin, via: 'ingest' },
     };
     this._stamp(e, text, nodeKey, { origin: 'ingested', declared_origin: origin });
@@ -457,6 +463,15 @@ export class Store {
         // a claim and says so: creator_verified false, no badge.
         creator_verified: e.key_verified === true,
         node_key_fingerprint: fp,
+        // C2 close (EOM-DEMO-UI-FIXWAVE-2026-10-28, REQ-SIGN-7): the reader's own verification
+        // kit, ship-shape in every entry - the raw 64-byte Ed25519 signature, the canonical
+        // signing bytes it covers, and the raw 32-byte public half (the key embedded in
+        // creator_ref, surfaced byte-exact). Honest nulls where an entry carries none. With
+        // these a reader re-checks the signature locally, forever, with its own crypto - the
+        // gateway boolean is an honest convenience, not the only check.
+        creator_sig_b64: typeof e.sig === 'string' ? e.sig : null,
+        creator_signed_b64: typeof e.sig_bytes_b64 === 'string' ? e.sig_bytes_b64 : null,
+        creator_pub_b64: NODE_KEY_ED25519_RE.test(String(e.name)) ? String(e.name).slice(12) : null,
         provenance: { origin: ingested ? 'ingested' : 'authored', entry_kind: e.kind, base_version: e.base_v,
           ...(e.provenance?.declared_origin && { declared_origin: e.provenance.declared_origin }),
           ...(e.merged && { merged: true }), ...(e.restored_v && { restored_version: e.restored_v }),
@@ -471,7 +486,7 @@ export class Store {
     return {
       format: 'seams-attribution-log/0-eom.2',
       wire: WIRE_VERSION,
-      note: 'Shaped after the fields of seams-wire/0.3-draft emit (kind, parents, derivation, creator_ref, provenance, use_terms), with the build-leg wire-semantics fixes: kind vocabulary enforced (entries are session-log; text/page payloads were mapped at the closed gate, no new wire kind), a version chain is NOT a derivation (parents stay [] and the log chain is carried separately in `chain`), content_hash/deposit_hash are computed once at append time and verified at load - a tampered log makes export refuse, it never silently re-hashes. Hashes remain opaque placeholders until the deposits-spec ruling lands. KEYS pass (0-eom.2, EOM-KEYS-2026-10-28): signing is live - creator_verified true means the gateway verified an Ed25519 signature over the canonical body (REQ-SIGN rules, pinned in eom/endpoint-surface/requirements.yaml) against the key embedded in node_key, at ingest time, for a registered key; a typed or unsigned node_key is a claim and stays creator_verified false. node_key_fingerprint is the first 8 chars of the base64 public half. A bad signature is refused at the gate (bad_signature), never deposited, never quarantined. This adds fields; it removes none - the 0-eom.1 readers keep working.',
+      note: 'Shaped after the fields of seams-wire/0.3-draft emit (kind, parents, derivation, creator_ref, provenance, use_terms), with the build-leg wire-semantics fixes: kind vocabulary enforced (entries are session-log; text/page payloads were mapped at the closed gate, no new wire kind), a version chain is NOT a derivation (parents stay [] and the log chain is carried separately in `chain`), content_hash/deposit_hash are computed once at append time and verified at load - a tampered log makes export refuse, it never silently re-hashes. Hashes remain opaque placeholders until the deposits-spec ruling lands. KEYS pass (0-eom.2, EOM-KEYS-2026-10-28): signing is live - creator_verified true means the gateway verified an Ed25519 signature over the canonical body (REQ-SIGN rules, pinned in eom/endpoint-surface/requirements.yaml) against the key embedded in node_key, at ingest time, for a registered key; a typed or unsigned node_key is a claim and stays creator_verified false. node_key_fingerprint is the first 8 chars of the base64 public half. A bad signature is refused at the gate (bad_signature), never deposited, never quarantined. This adds fields; it removes none - the 0-eom.1 readers keep working. Fix wave (EOM-DEMO-UI-FIXWAVE-2026-10-28, C2 close): every entry that deposited a gate-verified signature also ships creator_sig_b64 (the raw 64-byte Ed25519 signature), creator_signed_b64 (the canonical signing bytes it covers) and creator_pub_b64 (the raw 32-byte public half); entries without a signature carry honest nulls. A reader re-checks locally with its own crypto - the gateway boolean is an honest convenience, not the only check (REQ-SIGN-7). Adds fields, removes none: the log format holds at 0-eom.2 and the wire at seams-wire/0.3-draft.',
       integrity: { ok: true, tampered: [], corrupt_lines: this.integrity.corrupt.length, anchor_ok: this.integrity.anchorOk, legacy_bootstrap: this.integrity.legacy },
       nodes: [...this.nodes.entries()].map(([node_key, r]) => ({ node_key, who: r.who ?? null, first_seen: r.first_seen, seen: r.seen, verified: !!r.verified, node_key_fingerprint: fingerprintOf(node_key) })),
       use_terms: { allowed_uses: ['view', 'fork', 'remix'], compensation: 'none', note: 'Anyone may change this; your name stays on your words.' },

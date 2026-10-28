@@ -299,7 +299,7 @@ def test_requirements_tables_intact():
     assert SPEC_REQ_IDS == {
         f"REQ-HELLO-{i}" for i in range(1, 5)
     } | {f"REQ-EMIT-{i}" for i in range(1, 10)} | {f"REQ-EXPORT-{i}" for i in range(1, 6)} \
-        | {f"REQ-SIGN-{i}" for i in range(1, 7)} | {f"REQ-DEP-{i}" for i in range(1, 4)}, SPEC_REQ_IDS   # KEYS pass 2026-10-28: signing + deposits-view rules enter the pinned table
+        | {f"REQ-SIGN-{i}" for i in range(1, 8)} | {f"REQ-DEP-{i}" for i in range(1, 4)}, SPEC_REQ_IDS   # KEYS pass 2026-10-28: signing + deposits-view rules enter the pinned table; fix wave 2026-10-28 (C2 close): REQ-SIGN-7 reader-side export bytes
     assert SPEC_REFUSALS == {
         "unknown_kind": 400, "unknown_op": 400, "bad_node_key": 400,
         "consent_gate_unbuilt": 501, "parents_on_original": 400, "bad_origin": 400,
@@ -1068,6 +1068,103 @@ def test_deposits_view_is_keyed_honest_and_carries_no_custody():
         assert st == 200 and d["count"] == 0 and d["registered"] is False, "absence of deposits is an honest answer, not a 404"
         st, _, d = jget(t.base, "/api/deposits?node_key=" + urllib.parse.quote("key:!!", safe=""))
         assert st == 400 and d["error"] == "bad_node_key", (st, d)
+    finally:
+        t.stop()
+
+
+# ---------------------------------------------------------------------------
+# C2 close (EOM-DEMO-UI-FIXWAVE-2026-10-28): the export ships the raw signature bytes so
+# "anyone can verify, locally, forever" is literally true from the export alone (REQ-SIGN-7).
+# The re-check is deliberately independent of this repo's own signing code: the canonical
+# bytes are recomputed by a Python re-implementation of the pinned REQ-SIGN-1 rule, and the
+# signature is checked with Node's WebCrypto (the API a browser reader uses), nothing
+# imported from keys.mjs - the gateway boolean is tested as a convenience, not as the oracle.
+# ---------------------------------------------------------------------------
+
+def _canonical_json(obj) -> bytes:
+    """REQ-SIGN-1, re-implemented independently: canonical JSON, object keys sorted by
+    codepoint recursively, arrays order-preserving, no whitespace, UTF-8."""
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def _webcrypto_verify(pub_b64: str, sig_b64: str, msg_b64: str) -> str:
+    src = (
+        "let s=''; for await (const c of process.stdin) s += c;"
+        "const { pub, sig, msg } = JSON.parse(s);"
+        "try {"
+        "const k = await crypto.subtle.importKey('raw', new Uint8Array(Buffer.from(pub, 'base64')), { name: 'Ed25519' }, false, ['verify']);"
+        "const ok = await crypto.subtle.verify('Ed25519', k, Buffer.from(sig, 'base64'), Buffer.from(msg, 'base64'));"
+        "process.stdout.write(ok ? 'ok' : 'no');"
+        "} catch (e) { process.stdout.write('THROW:' + e.message); }"
+    )
+    p = subprocess.run([shutil.which("node") or "node", "--input-type=module", "-e", src],
+                       input=json.dumps({"pub": pub_b64, "sig": sig_b64, "msg": msg_b64}),
+                       capture_output=True, text=True, timeout=20)
+    assert p.returncode == 0, p.stderr
+    return p.stdout.strip()
+
+
+@req("REQ-SIGN-7")
+def test_export_ships_reader_side_bytes_and_an_independent_webcrypto_recheck_passes():
+    t = TargetNode().start()
+    try:
+        pair = keys_mint()
+        st, _, r = jpost(t.base, "/api/ingest", signed(announce_body(pair["nodeKey"], "Reader Probe"), pair))
+        assert st == 200 and r["status"] == "deposited"
+        text = uniq("reader-check")
+        body = {"op": "emit", "kind": "session-log", "node_key": pair["nodeKey"],
+                "text": text, "provenance": {"origin": "authored"}}
+        st, _, r = jpost(t.base, "/api/ingest", signed(body, pair))
+        assert st == 200 and r["creator_verified"] is True
+        _, _, x = jget(t.base, "/api/export")           # NO auth: the bytes are public like the log
+        e = next(x for x in x["entries"] if x["text"] == text)
+        assert e["creator_sig_b64"] and isinstance(e["creator_sig_b64"], str)
+        assert len(base64.b64decode(e["creator_sig_b64"], validate=True)) == 64, "the raw signature is the full 64 Ed25519 bytes"
+        assert e["creator_pub_b64"] == pair["pubB64"], "the exported public half is the key, byte-exact"
+        signed_bytes = base64.b64decode(e["creator_signed_b64"], validate=True)
+        # the reader's own REQ-SIGN-1 re-implementation must reproduce the shipped bytes exactly
+        assert _canonical_json({"op": "emit", "kind": "session-log", "node_key": pair["nodeKey"],
+                                "text": text, "provenance": {"origin": "authored"}}) == signed_bytes, \
+            "REQ-SIGN-7 + REQ-SIGN-1: the shipped signing bytes are the canonical body, byte-exact"
+        assert e["node_key_fingerprint"] == pair["pubB64"][:8], "fingerprint stays consistent with the shipped key (REQ-SIGN-5)"
+        assert _webcrypto_verify(e["creator_pub_b64"], e["creator_sig_b64"], e["creator_signed_b64"]) == "ok", \
+            "a reader with only the export + its own WebCrypto verifies"
+        # the deposits view rides the same bytes (REQ-DEP-3: verbatim export entries)
+        _, _, d = jget(t.base, "/api/deposits?node_key=" + urllib.parse.quote(pair["nodeKey"], safe=""))
+        assert d["entries"][0]["creator_sig_b64"] == e["creator_sig_b64"]
+    finally:
+        t.stop()
+
+
+@req("REQ-SIGN-7")
+def test_reader_side_recheck_refuses_tampering_and_unsigned_entries_stay_honest_nulls():
+    t = TargetNode().start()
+    try:
+        pair = keys_mint()
+        jpost(t.base, "/api/ingest", signed(announce_body(pair["nodeKey"], "Tamper Probe"), pair))
+        text = uniq("tamper-check")
+        st, _, r = jpost(t.base, "/api/ingest", signed(
+            {"op": "emit", "kind": "session-log", "node_key": pair["nodeKey"], "text": text,
+             "provenance": {"origin": "authored"}}, pair))
+        assert st == 200 and r["creator_verified"] is True
+        # an unsigned typed-name edit: the fields exist and say null honestly
+        _, _, stt = jget(t.base, "/api/state")
+        st, _, ed = jpost(t.base, "/api/edit", {"name": "Skeptic", "base_v": stt["v"],
+                                                "text": stt_head_text(stt) + " added by the skeptic"})
+        assert st == 200, ed
+        _, _, x = jget(t.base, "/api/export")
+        for e in x["entries"]:
+            if not str(e["creator_ref"]).startswith("key:ed25519:"):
+                assert e["creator_sig_b64"] is None and e["creator_signed_b64"] is None and e["creator_pub_b64"] is None, \
+                    "REQ-SIGN-7: no signature, no lies - honest nulls for claims"
+        ent = next(e for e in x["entries"] if e["text"] == text)
+        sig = bytearray(base64.b64decode(ent["creator_sig_b64"]))
+        sig[0] ^= 0x01
+        assert _webcrypto_verify(ent["creator_pub_b64"], base64.b64encode(bytes(sig)).decode(), ent["creator_signed_b64"]) == "no", \
+            "one flipped signature byte must break the reader's check - the verify is real, not a stub"
+        assert _webcrypto_verify(ent["creator_pub_b64"], ent["creator_sig_b64"],
+                                 base64.b64encode(base64.b64decode(ent["creator_signed_b64"]) + b"x").decode()) == "no", \
+            "one appended byte to the bytes must break the check too"
     finally:
         t.stop()
 
