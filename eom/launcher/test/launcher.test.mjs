@@ -573,6 +573,43 @@ test('port hygiene: second launch REUSES with a clear message - no EADDRINUSE, n
 const TAURI_DIR = path.join(here, '..', 'tauri');
 const BUNDLE_SH = path.join(here, '..', 'scripts', 'make-mac-bundle.sh');
 
+test('F3 published rate shape: launch.mjs pins the ruling budget into the node-one child env (keeper F3)', async () => {
+  // The live box shipped INGEST_LIMIT at the old default 30 while docs advertised 10: the launcher
+  // now ALWAYS boots node-one with the ruled shape (Erah 2026-10-26, ratified+shipped 2026-10-28).
+  // Asserted against the REAL child env via /proc - the boot shape is checkable, not folklore.
+  const [pL, pN] = await freePorts(2);
+  const s = spawnCollect(LAUNCH, { PORT: String(pL), NODE_ONE_PORT: String(pN), OPS_DIR: tmp('seams-ops-'), NODE_ONE_DATA_DIR: tmp('seams-n1-') });
+  try {
+    await waitLine(s, /Seams Launcher is up/);
+    const mN = s.out().match(/spawned node-one pid=(\d+)/);
+    assert.ok(mN, 'node-one child pid logged:\n' + s.out().slice(0, 500));
+    assert.match(s.out(), /published rate shape: INGEST_LIMIT=10 EDIT_LIMIT=10 GLOBAL_LIMIT=80 READ_LIMIT=300 READ_GLOBAL_LIMIT=1500 \(per 10-min window, socket-keyed\)/, 'the boot says what it pins');
+    const envText = fs.readFileSync(`/proc/${mN[1]}/environ`, 'latin1');
+    for (const [k, v] of Object.entries({ INGEST_LIMIT: '10', EDIT_LIMIT: '10', GLOBAL_LIMIT: '80', READ_LIMIT: '300', READ_GLOBAL_LIMIT: '1500' })) {
+      assert.ok(envText.includes(`${k}=${v}\u0000`) || envText.endsWith(`${k}=${v}`), `child env must carry the published shape ${k}=${v}`);
+    }
+  } finally {
+    if (s.proc.exitCode === null) s.proc.kill('SIGKILL');
+    await waitForExit(s.proc, 5000).catch(() => {});
+  }
+});
+
+test('F3 operator override: an explicit INGEST_LIMIT in the launcher env passes through unchanged (expert escape)', async () => {
+  const [pL, pN] = await freePorts(2);
+  const s = spawnCollect(LAUNCH, { PORT: String(pL), NODE_ONE_PORT: String(pN), OPS_DIR: tmp('seams-ops-'), NODE_ONE_DATA_DIR: tmp('seams-n1-'), INGEST_LIMIT: '30' });
+  try {
+    await waitLine(s, /Seams Launcher is up/);
+    const mN = s.out().match(/spawned node-one pid=(\d+)/);
+    assert.ok(mN, 'node-one child pid logged');
+    assert.match(s.out(), /published rate shape: INGEST_LIMIT=30 EDIT_LIMIT=10/, 'the boot notes the override verbatim');
+    const envText = fs.readFileSync(`/proc/${mN[1]}/environ`, 'latin1');
+    assert.ok(envText.includes('INGEST_LIMIT=30\u0000') || envText.endsWith('INGEST_LIMIT=30'), 'operator-set knob survives verbatim');
+  } finally {
+    if (s.proc.exitCode === null) s.proc.kill('SIGKILL');
+    await waitForExit(s.proc, 5000).catch(() => {});
+  }
+});
+
 test('tauri shell: scaffold is consistent - config, capability, rust, icons, gitignore', () => {
   const read = (p) => fs.readFileSync(path.join(TAURI_DIR, p), 'utf8');
   const conf = JSON.parse(read('src-tauri/tauri.conf.json'));

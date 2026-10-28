@@ -190,6 +190,106 @@ test('server: rate key is the socket - spoofed forwarded headers cannot bypass o
   } finally { srv.stop(); }
 });
 
+// ---------- F2/F3/F4 go-public rails (keeper 2026-10-28) ----------
+const uniq = (t) => `${t} ` + Math.random().toString(16).slice(2, 10);
+const rawSpawn = (env = {}) => {
+  // raw spawn helper: the startServer() harness pins BIND_HOST to loopback on purpose;
+  // the F4 rail tests need to control BIND_HOST, so they spawn directly like the tamper test does.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'eom-rail-'));
+  const child = spawn(process.execPath, [path.join(root, 'server.mjs')], {
+    cwd: root, env: { ...process.env, PORT: '0', DATA_DIR: dir, ...env }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  return { child, dir };
+};
+
+test('server F2: published read tier ENFORCED at origin by default - 300 served then 429+retry-after (RED ON OLD: pre-F2 binary answers 200 to all 360)', async () => {
+  const srv = startServer(); const { base } = await srv.ready;
+  try {
+    for (let i = 0; i < 300; i++) assert.equal((await fetch(base + '/api/hello')).status, 200, `read ${i}`);
+    const r = await fetch(base + '/api/hello');
+    assert.equal(r.status, 429, 'at the published 300/10-min read budget the ORIGIN itself refuses');
+    assert.equal((await r.json()).error, 'rate_limited');
+    const ra = r.headers.get('retry-after');
+    assert.ok(ra && Number(ra) > 0 && Number(ra) <= 600, '429 carries retry-after inside the window');
+    // separate buckets: a spent read tier does not mute writes on the same socket
+    const ing = await post(base, '/api/ingest', emit({ text: uniq('read-spent-but-writing') }));
+    assert.equal(ing.status, 200, 'read budget exhaustion cannot silence the write path');
+  } finally { srv.stop(); }
+});
+
+test('server F2b: read tier - successes only charge (peek/charge split); 0 on both knobs = loopback-dev escape', async () => {
+  const srv = startServer({ READ_LIMIT: '3', READ_GLOBAL_LIMIT: '0' }); const { base } = await srv.ready;
+  try {
+    for (let i = 0; i < 40; i++) assert.equal((await fetch(base + '/no-such-route-' + i)).status, 404, `error shape ${i}`);
+    for (let i = 0; i < 3; i++) assert.equal((await fetch(base + '/api/hello')).status, 200);
+    assert.equal((await fetch(base + '/api/hello')).status, 429, '404 flood burned nothing: budget went 0/3 -> 3/3 on three successes');
+  } finally { srv.stop(); }
+  const off = startServer({ READ_LIMIT: '0', READ_GLOBAL_LIMIT: '0' }); const o = await off.ready;
+  try {
+    for (let i = 0; i < 360; i++) assert.equal((await fetch(o.base + '/api/hello')).status, 200, 'keeper T2: 360 reads flow when the tier is off');
+  } finally { off.stop(); }
+});
+
+test('server T4b: cross-key replay refuses 409 by default (the squat guard holds at the server edge)', async () => {
+  const srv = startServer({}); const { base } = await srv.ready;
+  const bytes = { kind: 'session-log', text: 'identical bytes replayed by two keys ' + Math.random().toString(16).slice(2), provenance: { origin: 'authored' } };
+  try {
+    assert.equal((await post(base, '/api/ingest', emit(bytes))).status, 200);
+    const dup = await post(base, '/api/ingest', emit({ ...bytes, node_key: 'key:second-squatter' }));
+    assert.equal(dup.status, 409, 'default: cross-key byte replay is the squat case');
+    assert.equal((await dup.json()).error, 'already_deposited');
+  } finally { srv.stop(); }
+});
+
+test('server F4: non-loopback BIND_HOST REFUSES TO BOOT naming the escape hatch; with the hatch the banner says PUBLIC BIND, never loopback', async () => {
+  const a = rawSpawn({ BIND_HOST: '127.0.10.1' });   // non-loopback, no hatch: the case the keeper caught (F4)
+  const aOut = await new Promise((resolve) => {
+    let o = ''; a.child.stdout.on('data', (c) => { o += c; }); a.child.stderr.on('data', (c) => { o += c; });
+    a.child.on('exit', (code) => resolve({ code, o }));
+    setTimeout(() => resolve({ code: -1, o }), 8000);
+  });
+  assert.equal(aOut.code, 1, 'F4: a non-loopback bind without the named acknowledgement exits nonzero');
+  assert.match(aOut.o, /REFUSING TO BOOT/, 'loud refusal at boot');
+  assert.match(aOut.o, /SEAMS_ALLOW_PUBLIC_BIND=I-know-what-this-means/, 'the refusal names the escape hatch verbatim');
+  const b = rawSpawn({ BIND_HOST: '127.0.10.1', SEAMS_ALLOW_PUBLIC_BIND: 'I-know-what-this-means' });
+  const boot = await new Promise((resolve) => {
+    let o = ''; b.child.stdout.on('data', (c) => { o += c; const m = o.match(/listening on http:\/\/127\.0\.10\.1:(\d+)/); if (m) resolve({ o, port: m[1] }); });
+    b.child.stderr.on('data', (c) => { o += c; });
+    b.child.on('exit', (code) => resolve({ o, code }));
+    setTimeout(() => resolve({ o, code: -1 }), 8000);
+  });
+  try {
+    assert.ok(boot.port, 'with the named value it boots: ' + boot.o.slice(0, 300));
+    assert.match(boot.o, /PUBLIC BIND/, 'banner announces the operator-acknowledged public bind');
+    assert.ok(!/loopback bind/.test(boot.o), 'F4 honesty: the banner NEVER claims loopback when bound publicly');
+  } finally { try { b.child.kill('SIGKILL'); } catch { /* gone */ } }
+  const c = startServer({}); const { out } = await c.ready;   // default posture sanity: loopback banner still says loopback
+  try { assert.match(out(), /loopback bind/); } finally { c.stop(); }
+});
+
+test('server: / is the honest landing page; the editor lives at /text; landing.js served; landing makes no verified/payments/vouch claims', async () => {
+  const srv = startServer(); const { base } = await srv.ready;
+  try {
+    const home = await fetch(base + '/');
+    assert.equal(home.status, 200);
+    assert.match(home.headers.get('content-type'), /text\/html/);
+    const h = await home.text();
+    assert.match(h, /What this node is not/, 'the honest IS/IS-NOT list is the landing page spine');
+    for (const re of [/payments?\s*(accepted|enabled|processed|due)/i, /we\s+(charge|bill)|pricing\s+plan|paid\s+(plan|tier)|invoice\s+you|get\s+paid/i, /verified:\s*true|verified\s+by\s+(cloudflare|seams)/i]) {
+      assert.doesNotMatch(h, re, 'landing page must never make an affirmative commercial/verification claim: ' + re);
+    }
+    assert.match(h, /Not verified by anyone|No one has verified/i, 'and it states non-verification in words');
+    assert.match(h, /No payments|no pricing/i, 'and it states no-payments in words');
+    assert.match(h, /No vouches/i, 'and it states no-vouches in words');
+    const ed = await fetch(base + '/text');
+    assert.equal(ed.status, 200, 'the editor moved to /text (protocol keeps /)');
+    assert.match((await ed.text()), /One page|with attribution/i, 'the editor page still serves its content');
+    assert.ok(!h.includes('One page of text, with attribution</title>') , 'the editor HTML itself is no longer at /');
+    const js = await fetch(base + '/landing.js');
+    assert.equal(js.status, 200); assert.match(js.headers.get('content-type'), /javascript/);
+  } finally { srv.stop(); }
+});
+
 test('server: export REFUSES (503) on a tampered log and never re-hashes it clean', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'eom-tamp2-'));
   const s = new Store(path.join(dir, 'log.jsonl')); s.seed('witness text', 'Ann'); s.edit({ name: 'Bob', text: 'witness text appended', baseV: 1 });

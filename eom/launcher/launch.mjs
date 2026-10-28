@@ -13,6 +13,12 @@
 // env knobs (all optional): PORT (4173) NODE_ONE_PORT (8080) OPS_DIR NODE_ONE_DATA_DIR
 //   NODE_ONE_URL - expert override: point the proxy at an already-running loopback node-one
 //   instead of having this command start one. Non-loopback is refused here AND by the server.
+//
+// Rate shape (keeper F3, go-public pass 2026-10-28): the launcher ALWAYS boots node-one with the
+// ruled published budget in its environment - INGEST 10 / EDIT 10 / GLOBAL 80 / READ 300 /
+// READ_GLOBAL 1500 per 10-min window (Erah ruling 2026-10-26, ratified + shipped 2026-10-28) -
+// so the budget the docs advertise is the budget the boot enforces. An operator may still pin a
+// knob explicitly in their own environment (expert override); the default boot cannot under-publish.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -172,9 +178,17 @@ async function boot() {
     process.exit(1);
   } else {
     say(`node-one entry: ${LAYOUT.server}`);
+    // The ruled published shape (see header). Operator-set values in the environment win;
+    // an unset knob ALWAYS gets the ruling value - a launcher boot never under-publishes.
+    const RATE_PUBLISHED_SHAPE = { INGEST_LIMIT: '10', EDIT_LIMIT: '10', GLOBAL_LIMIT: '80', READ_LIMIT: '300', READ_GLOBAL_LIMIT: '1500' };
+    const rateEnv = {};
+    for (const [k, v] of Object.entries(RATE_PUBLISHED_SHAPE)) if (!(k in process.env)) rateEnv[k] = v;
+    const shapeNote = Object.entries(RATE_PUBLISHED_SHAPE).map(([k, v]) => `${k}=${rateEnv[k] ?? process.env[k]}`).join(' ');
+    say(`node-one boots with the published rate shape: ${shapeNote} (per 10-min window, socket-keyed)`);
     oneChild = supervise('node-one', LAYOUT.server, {
       PORT: String(NODE_ONE_PORT),
       ...(process.env.NODE_ONE_DATA_DIR ? { DATA_DIR: process.env.NODE_ONE_DATA_DIR } : {}),
+      ...rateEnv,
     });
     await waitUp(oneChild, NODE_ONE_PORT, 'node-one');
   }

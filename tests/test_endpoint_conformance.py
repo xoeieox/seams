@@ -76,7 +76,7 @@ HASH_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 # ruling. The matrix test below requires each to be exercised.
 EXPECTED_POLICY_KEYS = {
     "spec.tables", "spec.matrix", "gate.accept_set",
-    "rate.burn_policy", "rate.socket_key", "rate.reads_free",
+    "rate.burn_policy", "rate.socket_key", "rate.reads_budgeted",
     "rate.admin_up_front", "rate.defaults_match",
     "posture.loopback_bind", "posture.admin_token_hygiene", "posture.headers_unread",
     "export.public",
@@ -212,10 +212,29 @@ class TargetNode:
 
 
 def _ps_sweep():
-    """ps-verify clean: after a run, no node-one server anywhere is left alive."""
-    out = subprocess.run(["ps", "-eo", "args"], capture_output=True, text=True, timeout=20).stdout
+    """ps-verify clean: after a run, no CONFORMANCE TARGET is left alive.
+    Distinguishing rule (go-public 2026-10-28): a conformance target is a node-one whose
+    DATA_DIR is a harness temp prefix (TargetNode's eom-conformance-, the raw-boot rail
+    test's eom-rail-, the send-hello selftest's sendhello-*). The production trio runs
+    on its persistent data dir and is NOT a conformance target - matching bare command
+    lines used to false-positive on the live node (keeper sweep hygiene). A matching
+    process whose environ we cannot read is treated as a target (fail closed)."""
+    out = subprocess.run(["ps", "-eo", "pid=,args="], capture_output=True, text=True, timeout=20).stdout
     for line in out.splitlines():
-        if "server.mjs" in line and "attributed-text" in line:
+        if "server.mjs" not in line or "attributed-text" not in line:
+            continue
+        pid = line.strip().split(None, 1)[0]
+        try:
+            env = Path("/proc", pid, "environ").read_bytes().decode("utf-8", "replace")
+        except OSError:
+            if Path("/proc", pid).exists():
+                raise AssertionError("ps-verify: unverifiable node-one process survived: " + line.strip())
+            continue
+        import re as _re
+        m = _re.search(r"DATA_DIR=([^\x00]*)\x00", env + "\x00")
+        dd = (m.group(1) if m else "")
+        base = dd.rsplit("/", 1)[-1]
+        if base.startswith(("eom-conformance-", "eom-rail-", "sendhello-st-", "sendhello-f4-")):
             raise AssertionError("ps-verify: a conformance target survived the run: " + line.strip())
 
 
@@ -231,7 +250,14 @@ _SHARED = {"node": None}
 
 def shared_server():
     if _SHARED["node"] is None:
-        _SHARED["node"] = TargetNode().start()
+        # The shared target carries the whole module's traffic on one socket, so its
+        # per-socket write budget is a MODULE budget, not a test subject. The published
+        # shape (10/10/300/1500) is enforced-and-asserted elsewhere: this suite's own
+        # rate.reads_budgeted test boots a DEFAULT TargetNode (no overrides, published
+        # shape, red-on-old-green-on-new) plus a knob-pinned one; eom.test.mjs runs the
+        # read tier red/green; send-hello --selftest re-checks all of it. Here we only
+        # need semantics un-starved by cumulative module traffic.
+        _SHARED["node"] = TargetNode(env={"INGEST_LIMIT": "1000", "EDIT_LIMIT": "1000", "GLOBAL_LIMIT": "10000", "READ_LIMIT": "0", "READ_GLOBAL_LIMIT": "0"}).start()
     return _SHARED["node"]
 
 
@@ -279,7 +305,8 @@ def test_requirements_tables_intact():
     }, SPEC_REFUSALS
     assert ACCEPT_KINDS == ["node-key", "session-log"]
     assert (MAP_TEXT, MAP_PAGE) == ("session-log", "session-log")
-    assert RATE_DEFAULTS == {"edit_limit": 10, "ingest_limit": 30, "global_limit": 80, "window_ms": 600000}
+    assert RATE_DEFAULTS == {"edit_limit": 10, "ingest_limit": 10, "global_limit": 80,
+                             "read_limit": 300, "read_global_limit": 1500, "window_ms": 600000}
     assert ADMIN_MEASURED == 10
     assert "host_exposure_ruling" in REQS_TEXT and "ruled_by: Erah" in REQS_TEXT
 
@@ -743,19 +770,42 @@ def test_rate_key_is_the_socket_spoofed_forwarded_headers_cannot_reroute_it():
         t.stop()
 
 
-@req("rate.reads_free")
-def test_reads_charge_nothing_writes_remain_the_priced_tier():
-    t = TargetNode().start()   # no env overrides: the DEFAULT policy
+@req("rate.reads_budgeted")
+def test_reads_charge_the_read_tier_only_writes_keep_their_own_budget():
+    # F2 (keeper 2026-10-28): the published 300/1500 read tier is ENFORCED at origin by default.
+    # The old code charged no read bucket at all (keeper measured 360 reads, 0x429) - red-on-old,
+    # green-on-new is exactly this test.
+    t = TargetNode().start()   # no env overrides: the DEFAULT (published) policy
     try:
-        for _ in range(60):
+        for _ in range(RATE_DEFAULTS["read_limit"]):
             assert _http("GET", t.base, "/api/hello")[0] == 200
-        for _ in range(40):
-            assert _http("GET", t.base, "/api/export")[0] == 200
-        for i in range(5):     # reads cannot have eaten the write budget (measured_today: no read bucket exists)
+        st, hd, body = _http("GET", t.base, "/api/hello")
+        assert st == 429 and json.loads(body)["error"] == "rate_limited", \
+            "the read tier is real: at published limit the ORIGIN itself answers 429 + retry-after"
+        assert hd.get("retry-after") and int(hd["retry-after"]) <= RATE_DEFAULTS["window_ms"] // 1000
+        for i in range(5):     # a spent read bucket never touches the write tier: same socket, full budget
             st, _, r = jpost(t.base, "/api/ingest", emit_payload(text=uniq("tier-ok-" + str(i))))
-            assert st == 200 and r["status"] == "deposited"
+            assert st == 200 and r["status"] == "deposited", \
+                "reads and writes are separate buckets - burning the read tier cannot mute writes"
     finally:
         t.stop()
+    t2 = TargetNode(env={"READ_LIMIT": "3", "READ_GLOBAL_LIMIT": "0"}).start()
+    try:
+        for _ in range(25):    # peek/charge split mirrors the write tiers: error shapes burn nothing
+            assert _http("GET", t2.base, "/nope-not-a-route")[0] == 404
+        for _ in range(3):
+            assert _http("GET", t2.base, "/api/export")[0] == 200
+        st, _, body = _http("GET", t2.base, "/api/export")
+        assert st == 429 and json.loads(body)["error"] == "rate_limited", \
+            "after twenty-five 404s the budget is exactly 3/3 charged by the three successes only"
+    finally:
+        t2.stop()
+    t3 = TargetNode(env={"READ_LIMIT": "0", "READ_GLOBAL_LIMIT": "0"}).start()
+    try:  # loopback-dev escape: 0 on both read knobs disables the tier entirely
+        for _ in range(40):
+            assert _http("GET", t3.base, "/api/state")[0] == 200
+    finally:
+        t3.stop()
 
 
 @req("rate.admin_up_front")
@@ -842,6 +892,42 @@ def test_admin_token_custody_never_printed_0600_never_in_a_response():
         assert tok not in raw.decode("utf-8"), f"the token never appears in a data payload ({path})"
     _, _, body = jpost(t.base, "/api/ingest", emit_payload(text=uniq("custody-probe")))
     assert tok not in json.dumps(body)
+
+
+# ---------------------------------------------------------------------------
+# the F4 bind rail (keeper 2026-10-28): the loopback promise must be RAIL,
+# not env default - a non-loopback BIND_HOST refuses to boot unless the
+# operator names the escape hatch, and when they do the banner says PUBLIC
+# BIND instead of claiming loopback. This is the conformance assertion of
+# that rail (raw boot, no TargetNode - the rails sit around the bind).
+# ---------------------------------------------------------------------------
+
+def _spawn_node(env):
+    full = dict(os.environ, PORT="0", DATA_DIR=tempfile.mkdtemp(prefix="eom-rail-"))
+    full.pop("ADMIN_TOKEN", None)
+    full.update(env)
+    return subprocess.Popen(
+        [shutil.which("node") or "node", str(SERVER)], cwd=str(SERVER.parent), env=full,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
+
+@req("posture.loopback_bind")
+def test_f4_bind_rail_nonloopboot_refused_unless_hatch_named_verbatim():
+    node = _spawn_node({"BIND_HOST": "127.0.10.1"})          # non-loopback, no hatch: the keeper's case
+    out, _ = node.communicate(timeout=15)
+    assert node.returncode == 1, "F4: a non-loopback bind without the acknowledgement must not boot"
+    assert "REFUSING TO BOOT" in out, out
+    assert "SEAMS_ALLOW_PUBLIC_BIND=I-know-what-this-means" in out, \
+        "the refusal must name the hatch and its exact required value"
+    node2 = _spawn_node({"BIND_HOST": "127.0.10.1", "SEAMS_ALLOW_PUBLIC_BIND": "I-know-what-this-means"})
+    try:
+        line = node2.stdout.readline()
+        assert "listening on http://127.0.10.1:" in line, line
+        assert "PUBLIC BIND" in line, "the banner must announce the operator-acknowledged public bind"
+        assert "loopback bind" not in line, "F4 honesty: the banner NEVER claims loopback when bound publicly"
+    finally:
+        node2.kill()
+        node2.wait(timeout=5)
 
 
 # ---------------------------------------------------------------------------

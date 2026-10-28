@@ -1,6 +1,10 @@
 // Zero-dependency server: JSON API + static files. `node server.mjs` (BIND_HOST, PORT, DATA_DIR, ADMIN_TOKEN optional).
 // T1 pre-exposure hardening (EoM build leg, 2026-10-26; smoke T1a-T1d verdict):
-//   - binds loopback by default; exposure beyond loopback is a separate host/exposure ruling;
+//   - binds loopback, and since the go-public pass 2026-10-28 that is a RAIL not a default: a
+//     non-loopback BIND_HOST refuses to boot unless SEAMS_ALLOW_PUBLIC_BIND=I-know-what-this-means
+//     is set (the exposure-ruling escape hatch); the banner then says PUBLIC BIND, never "loopback";
+//   - the published rate shape is enforced AT ORIGIN by default (read 300/1500, ingest 10, edit 10,
+//     global 80 per 10-min window - Erah ruling 2026-10-26, ratified + shipped 2026-10-28).
 //   - the rate key is the socket peer address ONLY. cf-connecting-ip / x-forwarded-for are
 //     attacker-controlled headers and are NEVER read for identity (T1: the kit trusted them);
 //   - a request that fails validation or the store does not burn rate budget (peek/charge split);
@@ -18,8 +22,10 @@ const HOST = process.env.BIND_HOST || '127.0.0.1';   // T1: loopback until the e
 const PORT = Number(process.env.PORT || 8080);
 const DATA_DIR = process.env.DATA_DIR || path.join(here, 'data');
 const EDIT_LIMIT = Number(process.env.EDIT_LIMIT || 10);          // per socket-IP per window
-const INGEST_LIMIT = Number(process.env.INGEST_LIMIT || 30);      // per socket-IP per window
-const GLOBAL_LIMIT = Number(process.env.GLOBAL_LIMIT || 80);      // all sockets per window, per class
+const INGEST_LIMIT = Number(process.env.INGEST_LIMIT || 10);      // per socket-IP per window - public shape (F3): the loopback default was 30; the ruling is 10
+const GLOBAL_LIMIT = Number(process.env.GLOBAL_LIMIT || 80);      // all sockets per window, per write class
+const READ_LIMIT = Number(process.env.READ_LIMIT ?? 300);         // all GET reads per socket-IP per window; 0 disables (loopback-dev escape)
+const READ_GLOBAL_LIMIT = Number(process.env.READ_GLOBAL_LIMIT ?? 1500); // all GET reads, all sockets; 0 disables
 const WINDOW_MS = Number(process.env.WINDOW_MS || 10 * 60 * 1000);
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -55,7 +61,10 @@ function charge(bucket) {
 setInterval(() => { const now = Date.now(); for (const [k, a] of hits) if (!a.some((t) => now - t < WINDOW_MS)) hits.delete(k); }, 60000).unref();
 const socketIp = (req) => req.socket.remoteAddress || 'unknown-socket';
 
-const STATIC = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/app.css': ['app.css', 'text/css; charset=utf-8'] };
+// The go-public pass (2026-10-28) split the front door: '/' is the protocol LANDING page (the honest
+// human window - what Seams is/is-not, how to join, the live hello-worlds); the attributed-text
+// editor rides at '/text'. Static bytes are deterministic; no inline script (CSP script-src 'self').
+const STATIC = { '/': ['landing.html', 'text/html; charset=utf-8'], '/text': ['index.html', 'text/html; charset=utf-8'], '/index.html': ['index.html', 'text/html; charset=utf-8'], '/landing.js': ['landing.js', 'text/javascript; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/app.css': ['app.css', 'text/css; charset=utf-8'] };
 const HEADERS = {
   'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store',
@@ -87,9 +96,42 @@ const STATUS = {
   consent_gate_unbuilt: 501, log_integrity: 503,
 };
 
+// F4 rail (go-public 2026-10-28, keeper F4): "BIND_HOST=0.0.0.0 is honored while the boot banner
+// claims loopback-only" - the honesty line was an env DEFAULT, not enforcement. It is a rail now:
+// a non-loopback BIND_HOST refuses to boot unless the operator sets the named escape-hatch env to
+// the named value, and when they do the banner says PUBLIC BIND instead of lying about loopback.
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]', '::ffff:127.0.0.1']);
+const PUBLIC_BIND = !LOOPBACK_HOSTS.has(HOST);
+if (PUBLIC_BIND && process.env.SEAMS_ALLOW_PUBLIC_BIND !== 'I-know-what-this-means') {
+  console.error(`REFUSING TO BOOT: BIND_HOST=${JSON.stringify(HOST)} is not loopback.`);
+  console.error('This node speaks the exposure ruling: the attribution node binds loopback ONLY;');
+  console.error('public reach is cloudflared demo plumbing dialing IN to the loopback port, never');
+  console.error('the server binding a public interface (requirements.yaml host_exposure_ruling).');
+  console.error('If you truly mean to expose this process on a public interface, acknowledge the');
+  console.error('exposure ruling deliberately:  SEAMS_ALLOW_PUBLIC_BIND=I-know-what-this-means');
+  process.exit(1);
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x'), p = url.pathname;
   let emitRoute = false;   // REQ-EMIT-9: every emit-route response echoes wire - successes AND refusals (conformance suite, 2026-10-26)
+  // F2 read tier (go-public 2026-10-28): all GETs share the generous read tier (keeper measured
+  // 360/360 unthrottled reads against the published 300/1500 - fiction no more). Same peek/charge
+  // machinery as the write tiers: at-limit answers 429 BEFORE serving, and only SUCCESSFUL
+  // responses (<400) charge - 404/429/503 refusals burn nothing, so an error flood cannot exhaust
+  // an honest visitor's window (the ruling's burn policy, mirrored onto reads).
+  let readBucket = null;
+  if (req.method === 'GET') {
+    const ip = 'read-ip:' + socketIp(req);
+    const wait = (READ_LIMIT > 0 && peek(ip, READ_LIMIT)) || (READ_GLOBAL_LIMIT > 0 && peek('read-global', READ_GLOBAL_LIMIT));
+    if (wait) return fail(res, 429, 'rate_limited', `Too many reads. Try again in ${Math.ceil(wait / 60)} min.`, {}, { 'retry-after': String(wait) });
+    readBucket = ip;
+  }
+  const _writeHead = res.writeHead.bind(res);
+  res.writeHead = (code, ...rest) => {
+    if (readBucket && code < 400) { charge(readBucket); if (READ_GLOBAL_LIMIT > 0) charge('read-global'); readBucket = null; }
+    return _writeHead(code, ...rest);
+  };
   try {
     if (req.method === 'GET' && STATIC[p]) {
       const [file, type] = STATIC[p];
@@ -159,7 +201,7 @@ const server = http.createServer(async (req, res) => {
 });
 server.listen(PORT, HOST, function () {
   const port = (server.address() || {}).port || PORT;
-  console.log(`attributed-text node-one listening on http://${HOST}:${port} (wire ${WIRE_VERSION}; loopback bind until the exposure ruling)`);
+  console.log(`attributed-text node-one listening on http://${HOST}:${port} (wire ${WIRE_VERSION}; ${PUBLIC_BIND ? 'PUBLIC BIND - operator-acknowledged via SEAMS_ALLOW_PUBLIC_BIND, NOT the ruled posture; this box must sit behind the ruled cloudflared wiring' : 'loopback bind until the exposure ruling'})`);
   // T1 fix: the token is never printed. Its location is; the value is read from the 0600 file by the operator.
   console.log(`admin token: ${path.join(DATA_DIR, 'admin-token.txt')} (mode 0600) - open /#/admin and paste it to enable "restore this version"`);
 });
