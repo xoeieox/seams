@@ -204,15 +204,22 @@ if (flag('selftest')) {
     if (!/PUBLIC BIND/.test(b.out()) || /loopback bind/.test(b.out())) throw new Error('banner must say PUBLIC BIND, never loopback: ' + b.out().slice(0, 300));
     stop(b);
   });
-  await check('protocol surface: / landing honest IS/IS-NOT; editor at /text; landing.js served', async () => {
+  await check('site surface: / homepage honest spine; node landing at /protocol; editor at /text; landing.js + home.js served', async () => {
     const h = await F(main.base, '/');
-    eq(h.status, 200, 'landing served');
+    eq(h.status, 200, 'homepage served');
     const text = await h.text();
-    if (!/What this node is not/.test(text)) throw new Error('honest IS-NOT list missing');
-    for (const re of [/payments?\s*(accepted|enabled|processed|due)/i, /we\s+(charge|bill)|pricing\s+plan|paid\s+(plan|tier)|invoice\s+you|get\s+paid/i, /verified:\s*true|verified\s+by\s+(cloudflare|seams)/i]) if (re.test(text)) throw new Error('forbidden affirmative claim on landing: ' + re);
-    if (!/Not verified by any third party/.test(text) || !/No payments/.test(text) || !/No vouches/.test(text)) throw new Error('honest disclaimers incomplete');
-    if (!/Keys that check/.test(text)) throw new Error('landing must tell the keys story honestly ("Keys that check")');
-    if (!/href="\/demo"/.test(text)) throw new Error('Try-it must feature /demo');
+    if (!/What this is not/.test(text)) throw new Error('honest IS-NOT grid missing on the homepage');
+    for (const re of [/payments?\s*(accepted|enabled|processed|due)/i, /we\s+(charge|bill)|pricing\s+plan|paid\s+(plan|tier)|invoice\s+you|get\s+paid/i, /verified:\s*true|verified\s+by\s+(cloudflare|seams)/i]) if (re.test(text)) throw new Error('forbidden affirmative claim on homepage: ' + re);
+    if (!/No third party has verified anything/.test(text) || !/No payments/.test(text) || !/No vouches/.test(text)) throw new Error('honest disclaimers incomplete on the homepage');
+    if (!/Names here are claims\. Keys here are proof\./.test(text)) throw new Error('the copy spine is the homepage rule ("Names here are claims. Keys here are proof.")');
+    if (!/api\/export/.test(text)) throw new Error('the live window must point at the public machine view');
+    if (/mint/i.test(text)) throw new Error('browser mint on the homepage - the launcher is the one story');
+    const proto = await F(main.base, '/protocol');
+    eq(proto.status, 200, 'node landing at /protocol');
+    const protoText = await proto.text();
+    if (!/What this node is not/.test(protoText)) throw Error('honest node IS/IS-NOT list missing');
+    if (!/Keys that check/.test(protoText)) throw new Error('landing must tell the keys story honestly ("Keys that check")');
+    if (!/href="\/demo"/.test(protoText)) throw new Error('Try-it must feature /demo');
     const ed = await F(main.base, '/text'); eq(ed.status, 200, 'editor at /text');
     const edHtml = await ed.text();
     if (edHtml === text) throw new Error('/ and /text must not serve the same page');
@@ -223,6 +230,8 @@ if (flag('selftest')) {
     const js = await F(main.base, '/landing.js');
     eq(js.status, 200, 'landing.js served');
     if (!/javascript/.test(js.headers.get('content-type'))) throw new Error('landing.js wrong content-type');
+    const hj = await F(main.base, '/home.js');
+    eq(hj.status, 200, 'home.js served');
   });
   await check('KEYS: signed announce + signed emit verify at the gateway (creator_verified, fingerprint, registry, deposits view)', async () => {
     const pair = K.generateKeyPair();

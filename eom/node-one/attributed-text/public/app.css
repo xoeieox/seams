@@ -1,67 +1,221 @@
+/* =================== TOKEN BLOCK (board-1e, EOM-SITE-IMPL-2026-10-28) ===================
+   Surfaces / lines / ink / accent, light + dark, adopted as an oklch set. The block is the
+   ONLY place in the shipped CSS where oklch() or hex colors may appear - the site-gates
+   test enforces that (no token drift outside this block). The author palette (.a0-.a9) is
+   NOT part of this block: it stays a set of ten pinned hue classes in hsl() (see below),
+   because hue is identity, not surface. Type rules: Georgia body, IBM Plex Sans interface
+   (system fallback - self-hosting is a later cut; no external CDN ever), Plex Mono keys.
+   Radii stay small, spacing stays airy, shadows stay OFF - borders carry all structure. */
 :root {
-  --bg: #faf8f4; --fg: #1f1d1a; --muted: #77716a; --line: #e3ded6; --accent: #2d2a26; --panel: #f1ede6;
-  --l: 86%; --s: 75%;
   color-scheme: light dark;
+  /* light surfaces/lines/ink/accent */
+  --t-bg: oklch(98.0% 0.006 84.6); --t-panel: oklch(94.7% 0.010 81.8);
+  --t-line: oklch(90.2% 0.012 79.8); --t-mutline: oklch(84.0% 0.012 79.8);
+  --t-ink: oklch(23.2% 0.006 78.2); --t-muted: oklch(55.2% 0.013 71.8);
+  --t-accent: oklch(28.7% 0.008 75.2);
+  /* state tints: the <30s landing tint and the error rail (inside the block, verbatim) */
+  --t-fresh-bg: oklch(96.4% 0.011 86.0); --t-fresh-line: oklch(88.5% 0.015 84.0);
+  --t-err: oklch(52.0% 0.170 25.5);
+  /* radii + spacing (board-1e: small radii, no shadows) */
+  --t-r-s: 3px; --t-r-m: 8px; --t-r-btn: 999px;
+  --t-sp-1: 0.5rem; --t-sp-2: 1rem; --t-sp-3: 1.5rem; --t-sp-4: 2.5rem;
+  /* type stacks: Georgia body, Plex (system fallback) interface, Plex Mono keys */
+  --t-body: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  --t-ui: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif, Georgia, serif;
+  --t-keys: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #161513; --fg: #ebe7e0; --muted: #9a948b; --line: #2e2b27; --accent: #ebe7e0; --panel: #201e1b; --l: 30%; --s: 45%; }
+  :root:not([data-theme]) {
+    /* dark surfaces/lines/ink/accent (verbatim same-set mapping) */
+    --t-bg: oklch(19.7% 0.004 83.3); --t-panel: oklch(23.6% 0.006 78.2);
+    --t-line: oklch(29.1% 0.008 75.3); --t-mutline: oklch(36.0% 0.010 76.0);
+    --t-ink: oklch(92.9% 0.010 81.8); --t-muted: oklch(66.9% 0.015 78.2);
+    --t-accent: oklch(92.9% 0.010 81.8);
+    --t-fresh-bg: oklch(22.5% 0.009 83.0); --t-fresh-line: oklch(33.0% 0.012 80.0);
+    --t-err: oklch(66.0% 0.160 22.0);
+  }
 }
+:root[data-theme='dark'] {
+  --t-bg: oklch(19.7% 0.004 83.3); --t-panel: oklch(23.6% 0.006 78.2);
+  --t-line: oklch(29.1% 0.008 75.3); --t-mutline: oklch(36.0% 0.010 76.0);
+  --t-ink: oklch(92.9% 0.010 81.8); --t-muted: oklch(66.9% 0.015 78.2);
+  --t-accent: oklch(92.9% 0.010 81.8);
+  --t-fresh-bg: oklch(22.5% 0.009 83.0); --t-fresh-line: oklch(33.0% 0.012 80.0);
+  --t-err: oklch(66.0% 0.160 22.0);
+}
+/* ============================== TOKEN BLOCK END ============================== */
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 1.2rem/1.75 Georgia, "Iowan Old Style", "Times New Roman", serif; }
+body { margin: 0; background: var(--t-bg); color: var(--t-ink); font: 1.2rem/1.75 var(--t-body); }
 #app { max-width: 38rem; margin: 0 auto; padding: 2.5rem 1.25rem calc(3rem + env(safe-area-inset-bottom)); min-height: 100vh; }
-.ui { font: 0.95rem/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.ui { font: 0.95rem/1.4 var(--t-ui); }
+kbd, code, .mono { font-family: var(--t-keys); font-size: 0.9em; background: var(--t-panel); border-radius: var(--t-r-s); padding: 0.05rem 0.3rem; }
 .text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 2rem; }
-.meta, .foot { color: var(--muted); font-size: 0.82rem; }
+.meta, .foot { color: var(--t-muted); font-size: 0.82rem; }
 .foot { margin-top: 2.5rem; }
 .meta { margin: 0 0 1rem; }
-.bar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 1rem; }
-button, .btn { font: inherit; font-size: 0.92rem; color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 0.5rem 1rem; min-height: 2.5rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
-button:hover, .btn:hover { border-color: var(--muted); }
-button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
-button[aria-pressed="true"] { background: var(--panel); border-color: var(--muted); }
-button:disabled { opacity: 0.5; }
 a { color: inherit; text-underline-offset: 3px; }
-h2 { font: 600 1.05rem/1.3 system-ui, sans-serif; margin: 1.6rem 0 0.6rem; }
-.back { display: inline-block; margin-bottom: 1.2rem; color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+h2 { font: 600 1.05rem/1.3 var(--t-ui); margin: 1.6rem 0 0.6rem; }
+h3 { font: 600 0.95rem/1.3 var(--t-ui); margin: 1rem 0 0.4rem; }
 
-textarea, input { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 8px; width: 100%; padding: 0.7rem 0.8rem; }
+/* top nav (demo board-1c + homepage board-1a): wordmark, home link, mono api link */
+.nav { display: flex; align-items: center; gap: var(--t-sp-2); margin: 0 0 var(--t-sp-3); font: 0.95rem/1.4 var(--t-ui); }
+.nav .mark { font-family: var(--t-body); font-size: 1.15rem; text-decoration: none; }
+.nav .home { color: var(--t-muted); text-decoration: none; }
+.nav .home:hover { text-decoration: underline; }
+.nav .api { color: var(--t-muted); font-family: var(--t-keys); font-size: 0.82rem; text-decoration: none; }
+.nav .api:hover { text-decoration: underline; }
+.nav .spacer { flex: 1; }
+.nav .themebtn { background: transparent; border: 0; font: inherit; cursor: pointer; color: var(--t-muted); padding: 0.2rem 0.4rem; min-height: 2rem; }
+.nav .themebtn:hover { color: var(--t-ink); }
+
+.bar { display: flex; flex-wrap: wrap; gap: var(--t-sp-1); margin: 0 0 var(--t-sp-2); }
+button, .btn { font: 0.92rem/1.4 var(--t-ui); color: var(--t-ink); background: transparent; border: 1px solid var(--t-line); border-radius: var(--t-r-btn); padding: 0.5rem 1rem; min-height: 2.5rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+button:hover, .btn:hover { border-color: var(--t-muted); }
+button.primary, .btn.primary { background: var(--t-accent); color: var(--t-bg); border-color: var(--t-accent); }
+button[aria-pressed='true'] { background: var(--t-panel); border-color: var(--t-muted); }
+button:disabled { opacity: 0.5; }
+
+textarea, input { font: 1rem/1.5 var(--t-body); color: var(--t-ink); background: transparent; border: 1px solid var(--t-line); border-radius: var(--t-r-m); width: 100%; padding: 0.7rem 0.8rem; }
 textarea { min-height: 45vh; line-height: 1.7; resize: vertical; white-space: pre-wrap; }
-input { font-size: 1rem; }
-label { display: block; margin: 1rem 0 0.3rem; color: var(--muted); font-size: 0.85rem; }
-textarea:focus, input:focus { outline: 2px solid var(--muted); outline-offset: 1px; }
-.notice { background: var(--panel); border-radius: 8px; padding: 0.7rem 0.9rem; margin: 1rem 0; font-size: 0.9rem; }
-.notice.err { border-left: 3px solid #c0392b; }
+label { display: block; margin: var(--t-sp-2) 0 0.3rem; color: var(--t-muted); font-size: 0.85rem; font-family: var(--t-ui); }
+textarea:focus, input:focus { outline: 2px solid var(--t-muted); outline-offset: 1px; }
+.notice { background: var(--t-panel); border-radius: var(--t-r-m); padding: 0.7rem 0.9rem; margin: var(--t-sp-2) 0; font-size: 0.9rem; }
+.notice.err { border-left: 3px solid var(--t-err); }
+.banner { background: var(--t-panel); border-radius: var(--t-r-m); border-left: 3px solid var(--t-mutline); padding: 0.7rem 0.9rem; margin-bottom: var(--t-sp-2); font-size: 0.88rem; }
+.banner .mono { background: transparent; padding: 0; }
+.back { display: inline-block; margin-bottom: var(--t-sp-2); color: var(--t-muted); text-decoration: none; font-size: 0.9rem; }
 
-/* authors: one hue each, soft tint behind the words */
-.seg { border-radius: 3px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
-.color .seg, .dot, .chip { background: hsl(var(--h) var(--s) var(--l)); }
-.color .seg { cursor: help; }
+/* authors: ten pinned hue classes (fixed, board-1e; not in the token block - hue is identity).
+   Palette rules (board-1e): hue appears ONLY in the NAME text, the DOT, and the per-segment
+   UNDERLINE. The tint values (l 86 / l 30) keep serving dot+underline; a text-usable darker
+   variant (l 34 light / l 74 dark) carries hue into the author NAME. Verified = a neutral ink
+   ring, never green, no seal, no identity implication; claim = dashed. The .hl tint is a
+   selection state in the author view, not identity labelling. */
+:root { --t-pl: 86%; --t-plt: 34%; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) { --t-pl: 30%; --t-plt: 74%; } }
+:root[data-theme='dark'] { --t-pl: 30%; --t-plt: 74%; }
+
+.seg { border-radius: var(--t-r-s); -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.color .seg { text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: hsl(var(--h) var(--s) var(--t-pl)); text-underline-offset: 4px; cursor: help; }
+.dot { background: hsl(var(--h) var(--s) var(--t-pl)); }
 .dim .seg:not(.hl) { opacity: 0.45; }
-.hl { background: hsl(var(--h) var(--s) var(--l)); }
+.hl { background: hsl(var(--h) var(--s) var(--t-pl)); }
 .a0 { --h: 210; } .a1 { --h: 38; } .a2 { --h: 330; } .a3 { --h: 150; } .a4 { --h: 268; }
 .a5 { --h: 12; } .a6 { --h: 182; } .a7 { --h: 62; } .a8 { --h: 300; } .a9 { --h: 100; }
+/* hue in the NAME text (palette rules): the text-usable variant of the same ten hues */
+.name { color: hsl(var(--h) var(--s) var(--t-plt)); font-weight: 600; text-decoration: none; }
+/* collision fallback: the .alt dotted underline (fixed contract; hue.test.mjs pins this exact CSS shape) */
 .alt .seg, .alt.seg, .alt.chip { text-decoration: underline dotted; text-underline-offset: 4px; }
-.who { position: fixed; left: 50%; transform: translateX(-50%); width: calc(100% - 2.5rem); bottom: 0.75rem; box-shadow: 0 2px 12px rgba(0,0,0,.15); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.55rem 0.8rem; font-size: 0.85rem; max-width: 30rem; text-align: center; }
+.who { position: fixed; left: 50%; transform: translateX(-50%); width: calc(100% - 2.5rem); bottom: 0.75rem; border: 1px solid var(--t-line); background: var(--t-panel); border-radius: var(--t-r-m); padding: 0.55rem 0.8rem; font-size: 0.85rem; max-width: 30rem; text-align: center; }
 .who[hidden] { display: none; }
+.dot { display: inline-block; width: 0.9rem; height: 0.9rem; border-radius: 50%; border: 1px solid var(--t-muted); flex: none; }
 
-.dot { display: inline-block; width: 0.9rem; height: 0.9rem; border-radius: 50%; border: 1px solid var(--muted); flex: none; }
+/* KEYS verified/claim badges, site-impl restyle (EOM-SITE-IMPL-2026-10-28): badges stay a VISUAL
+   class (fixwave Leg 3) but turn NEUTRAL - the verified badge is an ink ring, no green, no seal,
+   no identity implication; the claim tag stays dashed-muted. Tokens only, no shadows. */
+.vbadge { font: 600 0.72rem/1.4 var(--t-ui); padding: 0.1rem 0.5rem; border-radius: var(--t-r-btn); border: 1px solid var(--t-ink); outline: 1px solid var(--t-line); outline-offset: 2px; color: var(--t-ink); background: var(--t-bg); white-space: nowrap; text-decoration: none; cursor: pointer; }
+.vbadge:hover { outline-color: var(--t-mutline); }
+.claimtag { font: 600 0.72rem/1.4 var(--t-ui); padding: 0.1rem 0.45rem; border-radius: var(--t-r-btn); border: 1px dashed var(--t-muted); color: var(--t-muted); background: transparent; white-space: nowrap; }
+
+/* lists, history diff rows */
 .list { list-style: none; padding: 0; margin: 0; }
-.list li > a, .list li > button { display: flex; gap: 0.7rem; align-items: center; width: 100%; padding: 0.8rem 0.2rem; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; text-align: left; text-decoration: none; min-height: 3rem; }
-.list .sub { margin-left: auto; color: var(--muted); font-size: 0.82rem; text-align: right; }
-.change { border-bottom: 1px solid var(--line); padding: 0.8rem 0; font-size: 1.02rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-.change .when { display: block; color: var(--muted); font-size: 0.78rem; margin-bottom: 0.2rem; }
-.chip { border-radius: 3px; }
-.rm { text-decoration: line-through; text-decoration-color: var(--muted); opacity: 0.85; }
-.arrow { color: var(--muted); padding: 0 0.3rem; }
-.banner { background: var(--panel); border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 1.2rem; font-size: 0.88rem; }
+.list li > a, .list li > button { display: flex; gap: 0.7rem; align-items: center; width: 100%; padding: 0.8rem 0.2rem; border: 0; border-bottom: 1px solid var(--t-line); border-radius: 0; text-align: left; text-decoration: none; min-height: 3rem; background: transparent; }
+.list .sub { margin-left: auto; color: var(--t-muted); font-size: 0.82rem; text-align: right; }
+.change { border-bottom: 1px solid var(--t-line); padding: 0.8rem 0; font-size: 1.02rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.change .when { display: block; color: var(--t-muted); font-size: 0.78rem; margin-bottom: 0.2rem; }
+.chip { border-radius: var(--t-r-s); text-decoration: underline; text-decoration-color: hsl(var(--h) var(--s) calc(var(--l))); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.rm { text-decoration: line-through; text-decoration-color: var(--t-muted); opacity: 0.85; }
+.arrow { color: var(--t-muted); padding: 0 0.3rem; }
 
-/* KEYS demo (EOM-KEYS-2026-10-28): gateway-checked attribution vs claims, visually distinct.
-   Fix wave 2026-10-28 (Leg 3): the checked badge is a VISUAL CLASS, not a word - filled
-   palette tint + double ring reads as "this row is checked" at a glance, in either scheme.
-   The claim tag stays visually modest (dashed, muted). What renders here is unchanged copy,
-   and it still comes from exactly one source: the export's creator_verified + fingerprint
-   map (adversary T9 - nothing body-provided ever renders verified). */
-.vbadge{font:600 .72rem/1.4 ui-sans-serif,system-ui;padding:.1rem .5rem;border-radius:99px;border:1px solid #2e7d32;color:#1b5e20;background:#d7eeda;box-shadow:inset 0 0 0 1px rgba(46,125,50,.28),0 0 0 3px rgba(46,125,50,.12);white-space:nowrap}
-@media (prefers-color-scheme: dark) { .vbadge{color:#a5d6a7;background:#223821;border-color:#81c784;box-shadow:inset 0 0 0 1px rgba(129,199,132,.3),0 0 0 3px rgba(129,199,132,.14)} }
-.claimtag{font:600 .72rem/1.4 ui-sans-serif,system-ui;padding:.1rem .45rem;border-radius:99px;border:1px dashed #9a958c;color:#6d675e;background:#f3f1ec;white-space:nowrap}
+/* board-1c demo: invite + writing-as field (claim badge always showing what a typed name is),
+   legend strip (board-1d option A) and its popover (B), names sidebar, last-line add */
+.invite { font: 1.1rem/1.5 var(--t-body); margin: 0 0 var(--t-sp-2); }
+.writeas { display: flex; flex-wrap: wrap; gap: var(--t-sp-1); align-items: center; margin: 0 0 var(--t-sp-2); font: 0.9rem/1.4 var(--t-ui); }
+.writeas label { display: inline; margin: 0; color: var(--t-muted); }
+.writeas input { width: 14rem; max-width: 60%; padding: 0.35rem 0.6rem; font-size: 0.92rem; }
+.writeas .sub { color: var(--t-muted); font-size: 0.8rem; width: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.6rem 1.1rem; align-items: center; border-top: 1px solid var(--t-line); border-bottom: 1px solid var(--t-line); padding: 0.45rem 0; margin: 0 0 var(--t-sp-2); font: 0.78rem/1.4 var(--t-ui); color: var(--t-muted); }
+.legend .term { background: none; border: 0; font: inherit; color: var(--t-muted); cursor: pointer; padding: 0; text-decoration: underline dotted; text-underline-offset: 3px; display: inline-flex; align-items: center; gap: 0.35rem; }
+.legend .term:hover { color: var(--t-ink); }
+.legend .dot { width: 0.65rem; height: 0.65rem; border-radius: var(--t-r-s); }
+.legend .swchecked { display: inline-block; width: 0.9em; height: 0.9em; border-radius: var(--t-r-btn); border: 1px solid var(--t-ink); outline: 1px solid var(--t-line); outline-offset: 1px; }
+.legend .swclaim { display: inline-block; width: 0.9em; height: 0.9em; border-radius: var(--t-r-btn); border: 1px dashed var(--t-muted); }
+.pop { position: fixed; left: 50%; bottom: 0.9rem; transform: translateX(-50%); width: calc(100% - 2.5rem); max-width: 32rem; background: var(--t-panel); border: 1px solid var(--t-line); border-radius: var(--t-r-m); padding: 0.8rem 1rem; font: 0.85rem/1.5 var(--t-ui); z-index: 5; }
+.pop[hidden] { display: none; }
+.pop .x { float: right; border: 0; background: none; font: inherit; cursor: pointer; color: var(--t-muted); }
+.frame { display: grid; grid-template-columns: 1fr; gap: var(--t-sp-3); }
+.side { font: 0.9rem/1.5 var(--t-ui); }
+@media (min-width: 58rem) {
+  #app.wide { max-width: 56rem; }
+  .frame { grid-template-columns: minmax(0, 1fr) 15rem; gap: var(--t-sp-4); align-items: start; }
+  .side { position: sticky; top: 1rem; }
+}
+.side ul { list-style: none; margin: 0.3rem 0; padding: 0; }
+.side li { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px dotted var(--t-line); }
+.side .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side .sub { margin-left: auto; color: var(--t-muted); font-size: 0.75rem; white-space: nowrap; }
+.side .more { color: var(--t-muted); font-size: 0.8rem; text-decoration: none; }
+.side .note { margin: 0.5rem 0 0; font-size: 0.78rem; line-height: 1.5; color: var(--t-muted); }
+.side h3 { margin-top: 0; }
+/* last-line add: the one-text-block model keeps one continuous text; the board's per-line
+   grid maps onto per-segment spans, so "add a line" is an append that lands as your words */
+.addline { display: flex; gap: var(--t-sp-1); align-items: center; margin: 0 0 var(--t-sp-2); }
+.addline input { font-size: 0.98rem; padding: 0.5rem 0.7rem; }
+/* deposits: entry point from any verified badge card (board-1c); cards list every key that
+   ever deposited, its badge state, and its count - the truth behind it is the same public
+   /api/deposits?node_key= view the export feeds */
+.dcards { list-style: none; padding: 0; margin: 0 0 var(--t-sp-2); }
+.dcards li { border: 1px solid var(--t-line); border-radius: var(--t-r-m); padding: 0.7rem 0.9rem; margin: 0 0 var(--t-sp-1); font: 0.92rem/1.5 var(--t-ui); }
+.dcards a { text-decoration: none; display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.dcards .sub { color: var(--t-muted); font-size: 0.8rem; margin-left: auto; }
+.dfeed { list-style: none; padding: 0; margin: 0 0 var(--t-sp-2); }
+.dfeed li { border-bottom: 1px solid var(--t-line); padding: 0.6rem 0; font-size: 0.92rem; line-height: 1.5; }
+.dfeed .when { color: var(--t-muted); font-size: 0.78rem; font-family: var(--t-ui); display: block; }
+
+/* =============== homepage (board-1a/1b): nav, live window, spine, grid, launcher =============== */
+.home { max-width: 42rem; margin: 0 auto; padding: 2rem 1.25rem calc(3rem + env(safe-area-inset-bottom)); }
+.home .nav { margin-top: 0; }
+.spine { font: 1.5rem/1.45 var(--t-body); margin: var(--t-sp-3) 0 var(--t-sp-1); }
+.spine .sub { font: 0.95rem/1.5 var(--t-ui); color: var(--t-muted); margin: 0 0 var(--t-sp-3); }
+.wnd { border: 1px solid var(--t-line); border-radius: var(--t-r-m); overflow: hidden; margin: 0 0 var(--t-sp-3); }
+.wnd .wndhead { display: flex; align-items: center; gap: var(--t-sp-2); padding: 0.5rem 0.9rem; border-bottom: 1px solid var(--t-line); background: var(--t-panel); font: 0.85rem/1.4 var(--t-ui); color: var(--t-muted); }
+.wnd .wndhead .t { color: var(--t-ink); font-weight: 600; }
+.wnd .wndhead .state { margin-left: auto; font-size: 0.78rem; }
+.wnd .wndhead .refresh { border: 1px solid var(--t-line); border-radius: var(--t-r-btn); background: transparent; font: inherit; color: var(--t-muted); padding: 0.15rem 0.6rem; cursor: pointer; min-height: 1.9rem; }
+.wnd .wndhead .refresh:hover { color: var(--t-ink); border-color: var(--t-muted); }
+.wndbody { padding: 0.2rem 0.9rem 0.6rem; }
+.feedrow { display: block; padding: 0.55rem 0; border-bottom: 1px dotted var(--t-line); font: 0.92rem/1.5 var(--t-body); text-decoration: none; }
+.feedrow:hover { background: var(--t-panel); }
+.feedrow.fresh { background: var(--t-fresh-bg); border-bottom-color: var(--t-fresh-line); }
+.feedrow .rowhead { display: flex; align-items: center; gap: 0.5rem; font: 0.8rem/1.4 var(--t-ui); }
+.feedrow .rowhead .when { margin-left: auto; color: var(--t-muted); font-size: 0.75rem; white-space: nowrap; }
+.feedrow .snippet { color: var(--t-ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.wnd .empty { padding: 1rem 0 1.2rem; font: 0.92rem/1.6 var(--t-body); color: var(--t-muted); }
+.wnd .legline { border-top: 1px solid var(--t-line); padding: 0.4rem 0.9rem; font: 0.75rem/1.5 var(--t-ui); color: var(--t-muted); }
+.grid2 { display: grid; grid-template-columns: 1fr; gap: var(--t-sp-2) var(--t-sp-3); margin: 0 0 var(--t-sp-3); }
+@media (min-width: 46rem) { .grid2 { grid-template-columns: 1fr 1fr; } }
+.grid2 .cell { border-top: 1px solid var(--t-line); padding-top: 0.6rem; }
+.grid2 h3 { margin: 0 0 0.35rem; font: 600 0.95rem/1.3 var(--t-ui); }
+.grid2 ul { margin: 0; padding-left: 1.1rem; font: 0.92rem/1.6 var(--t-body); }
+.grid2 li { margin: 0.25rem 0; }
+.launcher { border: 1px solid var(--t-line); border-radius: var(--t-r-m); padding: 0.9rem 1.1rem; margin: 0 0 var(--t-sp-3); background: var(--t-panel); }
+.launcher h3 { margin: 0 0 0.3rem; font: 600 1rem/1.3 var(--t-ui); }
+.launcher p { font: 0.92rem/1.55 var(--t-body); margin: 0 0 0.6rem; }
+.launcher .honest { font: 0.8rem/1.5 var(--t-ui); color: var(--t-muted); margin: 0.5rem 0 0; }
+.launcher .row { display: flex; flex-wrap: wrap; gap: var(--t-sp-1); align-items: center; }
+.homefoot { border-top: 1px solid var(--t-line); margin-top: var(--t-sp-3); padding-top: 0.7rem; font: 0.8rem/1.6 var(--t-ui); color: var(--t-muted); }
+.homefoot a { color: var(--t-muted); }
+
+/* =============== protocol landing (/protocol): token-styled doc (was inline hex) =============== */
+.doc { max-width: 44rem; margin: 3rem auto; padding: 0 1rem; }
+.doc .navtrail { font: 0.9rem/1.4 var(--t-ui); margin: 0 0 1.4rem; }
+.doc .navtrail a { color: var(--t-muted); text-decoration: none; }
+.doc .navtrail a:hover { text-decoration: underline; }
+.doc h1 { font-size: 1.5rem; font-family: var(--t-body); margin-bottom: 0.2rem; }
+.doc .sub { color: var(--t-muted); margin-top: 0; font: 0.95rem/1.5 var(--t-ui); }
+.doc h2 { font-size: 1.05rem; margin-top: 2rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--t-muted); }
+.doc ul { padding-left: 1.2rem; font: 0.98rem/1.6 var(--t-body); }
+.doc li { margin: 0.35rem 0; }
+.doc .live { border: 1px solid var(--t-line); padding: 0.8rem 1rem; border-radius: var(--t-r-m); background: var(--t-panel); font-family: var(--t-keys); font-size: 0.85rem; white-space: pre-wrap; }
+.doc footer { margin-top: 3rem; color: var(--t-muted); font: 0.85rem/1.5 var(--t-ui); border-top: 1px solid var(--t-line); padding-top: 1rem; }

@@ -61,13 +61,22 @@
   // KEYS demo (EOM-KEYS-2026-10-28): verified ✓ + fingerprint come from ONE source - the export's
   // creator_verified, true only where the gateway checked an Ed25519 signature at ingest.
   // Nothing here computes trust: a key:ed25519 author without a checked signature stays a claim,
-  // visibly. The export is public; one short-lived cache keeps the 20 s auto-refresh off the
-  // read budget while the map stays fresh enough for a live demo.
+  // visibly. Site-impl wave (2026-10-28): one short-lived export cache now backs the verif map,
+  // the /demo?landed=<hash> arrival banner, and the deposits view - one poll, off the read budget.
   let verif = { at: 0, map: null };
+  let xs = { at: 0, x: null, pending: null };
+  const XS_TTL = 15000;
+  async function exportX(force) {
+    if (!force && xs.x && Date.now() - xs.at < XS_TTL) return xs.x;
+    if (!force && xs.pending) return xs.pending;
+    xs.pending = api('/api/export').then((x) => { xs = { at: Date.now(), x, pending: null }; return x; })
+      .catch((e) => { xs.pending = null; throw e; });
+    return xs.pending;
+  }
   async function verifMap() {
     if (verif.map && Date.now() - verif.at < 15000) return verif.map;
     try {
-      const x = await api('/api/export');
+      const x = await exportX();
       const m = new Map();
       for (const e of (x.entries || [])) {
         const ref = e.creator_ref;
@@ -83,19 +92,107 @@
   function verifyBadge(name, map) {
     if (!isEdKey(name)) return null;
     const rec = map && map.get(name);
+    // board-1c: badges in either state open the deposits view - every byte that key ever
+    // deposited, straight from the public /api/deposits?node_key= truth.
+    const b = el('a', rec && rec.verified ? 'vbadge' : 'claimtag');
+    b.href = '#/d/' + encodeURIComponent(name);
     if (rec && rec.verified) {
-      const b = el('span', 'vbadge', '✓ verified · ' + rec.fp);
-      b.title = 'creator_verified true: the gateway checked this key\u2019s Ed25519 signature at ingest (REQ-SIGN). The fingerprint is the first 8 chars of the public key.';
-      return b;
+      b.textContent = '✓ verified · ' + rec.fp;
+      b.title = 'creator_verified true: the gateway checked this key\u2019s Ed25519 signature at ingest (REQ-SIGN). The fingerprint is the first 8 chars of the public key. No third party verified anything.';
+    } else {
+      b.textContent = 'claim';
+      b.title = 'A key was used but no signature was verified at ingest - this attribution is a claim, not a check.';
     }
-    const b = el('span', 'claimtag', 'claim');
-    b.title = 'A key was used but no signature was verified at ingest - this attribution is a claim, not a check.';
     return b;
   }
   function verifWord(name, map) {
     if (!isEdKey(name)) return '';
     const rec = map && map.get(name);
     return rec && rec.verified ? ' ✓ verified · ' + rec.fp : ' · claim';
+  }
+
+  // ---------- site-impl rework (board-1c/1d, EOM-SITE-IMPL-2026-10-28) ----------
+  const landedHash = () => { try { return new URLSearchParams(location.search).get('landed') || ''; } catch { return ''; } };
+  // arrival banner truth: the export is the only answer. A fingerprint match highlights the
+  // landing; an entry not (yet) found says so honestly and keeps watching.
+  async function landedBannerRecognition() {
+    const q = landedHash();
+    if (!q) return null;
+    let found = null;
+    try {
+      const x = await exportX();
+      const score = (e) => {
+        const fp = String(e.node_key_fingerprint || '').toLowerCase();
+        const ref = String(e.creator_ref || '');
+        const dep = String(e.deposit_hash || '');
+        if (fp && q.length >= 4 && (fp === q.toLowerCase() || (q.toLowerCase().startsWith(fp) && q.length <= 12))) return 3;
+        if (dep && q === dep.replace(/^sha256:/, '').slice(0, 16)) return 2;
+        if (q.length >= 8 && ref.endsWith(q)) return 2;
+        return 0;
+      };
+      found = (x.entries || []).map((e) => [e, score(e)]).filter(([, s]) => s > 0).sort((a, b) => b[1] - a[1])[0];
+    } catch { /* gateway quiet: banner stays honest, no fake confirmation */ }
+    const b = el('div', 'banner ui');
+    let matched = null;
+    if (found) {
+      const e = found[0];
+      matched = String(e.text || '');
+      b.append('It landed. Version ' + e.v + ' is on the log, fingerprint ' + (e.node_key_fingerprint || '(none)') + '. ');
+      const a = el('a', '', 'Every byte that key deposited'); a.href = '#/d/' + encodeURIComponent(e.creator_ref);
+      b.append(a);
+    } else {
+      b.append('Looking for a landing from your launcher. This banner reads only the honest export: ');
+      const a = el('a', '', 'check /api/export'); a.href = '/api/export';
+      b.append(a);
+      b.append(' - when the fingerprint shows up there, it is real. Until then, no confirmation is claimed.');
+    }
+    return { banner: b, matched, q };
+  }
+  // legend strip (board-1d option A), always visible; terms open a popover (option B).
+  function legendStrip() {
+    const strip = el('div', 'legend ui');
+    const term = (node, label, text) => {
+      const b = el('button', 'term'); b.type = 'button';
+      b.append(node, el('span', '', label));
+      b.addEventListener('click', () => showPop(text));
+      return b;
+    };
+    strip.append(
+      term(el('span', 'dot a0'), 'colour = author', 'Colour is identity, not position: each author derives one hue from a hash of who they are, so the same author is the same colour everywhere, forever.'),
+      term(el('span', 'swchecked'), '✓ verified', 'The gateway checked this key’s Ed25519 signature at ingest, over the exact bytes deposited, against the key itself. That is the whole check - no third party, no vouch, no identity claim anywhere.'),
+      term(el('span', 'swclaim'), 'claim', 'A name was typed, or a key was used with no verified signature. It stays a claim, forever, visible next to the checked rows.'),
+    );
+    return strip;
+  }
+  let popEl = null;
+  function showPop(text) {
+    if (!popEl) {
+      popEl = el('div', 'pop ui');
+      popEl.setAttribute('role', 'status');
+      const x = el('button', 'x'); x.type = 'button'; x.textContent = '×'; x.title = 'Close';
+      x.addEventListener('click', () => { popEl.hidden = true; });
+      popEl.append(x, el('p', '', text));
+      document.body.append(popEl);
+    } else {
+      const x = popEl.querySelector('.x');
+      for (const n of Array.from(popEl.children)) if (n !== x) n.remove();
+      popEl.append(el('p', '', text));
+      popEl.hidden = false;
+    }
+  }
+  function hidePop() { if (popEl) popEl.hidden = true; }
+  // two-Erah note (board-1c): the honest seam, visible rather than smoothed over. Two keyless
+  // names whose first word matches read as one claimed name; the log does not decide who is real.
+  const nameStem = (n) => n.trim().toLowerCase().split(/[\s\-_.@]+/, 1)[0].replace(/[^a-z0-9]+/g, '') || n.toLowerCase();
+  function nameNote(authors) {
+    const names = authors.map((a) => a.name);
+    for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++) {
+      const s1 = nameStem(names[i]), s2 = nameStem(names[j]);
+      if (s1 && s2 && (s1 === s2 || s1.startsWith(s2) || s2.startsWith(s1))) {
+        return `“${names[i]}” and “${names[j]}” share a name. Both stay, exactly as claimed - the log records who wrote what, and leaves who is real to the reader. Fingerprints are how an Ed25519 claim tells itself apart.`;
+      }
+    }
+    return 'Names here are claims. Any name may be typed by anyone - what distinguishes is the signature the launcher can prove.';
   }
 
   // Render segments as spans. opts.color: tint by author. opts.only: highlight just this author name.
@@ -123,28 +220,109 @@
   function withTip(box) { const w = el('div'); w.append(box); if (box._tip) w.append(box._tip); return w; }
 
   const nav = (href, label) => { const a = el('a', 'back ui', label); a.href = href; return a; };
+  // demo header (board-1c): wordmark + ‹ seams home, always available on the main view
+  const demoHeader = () => {
+    const n = el('nav', 'nav ui');
+    const mark = el('a', 'mark', 'Seams'); mark.href = '/';
+    const home = el('a', 'home', '‹ seams home'); home.href = '/';
+    n.append(mark, home);
+    return n;
+  };
+  // the writing-as field (board-1c): whatever is typed here is the name of the claim; a typed
+  // name is ALWAYS a claim (badge), and the honest proof path is the launcher, out of band.
+  function writingAs() {
+    const w = el('div', 'writeas ui');
+    const lab = el('label', '', 'Writing as');
+    const i = el('input'); i.maxLength = 40; i.autocomplete = 'nickname'; i.placeholder = 'Any name you like';
+    i.id = 'writeas-name'; i.value = store.get('name') || '';
+    lab.htmlFor = 'writeas-name';
+    const badge = el('span', 'claimtag', 'claim');
+    badge.title = 'Names on this page are claims: a typed name is not checked. Proof comes from the launcher, which mints keys and signs deposits.';
+    i.addEventListener('input', () => store.set('name', i.value));
+    w.append(lab, i, badge);
+    const sub = el('span', 'sub', 'a name here is a claim - the launcher is how you get proof');
+    w.append(sub);
+    w.input = i;
+    return w;
+  }
+  // names sidebar (board-1c): hue-stable dots, badges, counts + the open two-names note.
+  function namesSide(map) {
+    const side = el('aside', 'side');
+    side.append(el('h3', '', 'Names'));
+    const ul = el('ul');
+    for (const a of state.authors) {
+      const li = el('li');
+      const dot = el('span', `dot a${hueSlot(a.name)}`);
+      const name = el('a', `name a${hueSlot(a.name)}`, a.name); name.href = '#/a/' + encodeURIComponent(a.name);
+      const sub = el('span', 'sub', `${a.edits}e · ${a.words}w`);
+      li.append(dot, name, sub);
+      const vb = verifyBadge(a.name, map); if (vb) li.append(vb);
+      ul.append(li);
+    }
+    side.append(ul);
+    const more = el('a', 'more', 'All names →'); more.href = '#/names';
+    side.append(more, el('p', 'note', nameNote(state.authors)));
+    return side;
+  }
   const btn = (label, fn, cls) => { const b = el('button', cls || '', label); b.type = 'button'; b.addEventListener('click', fn); return b; };
   const linkBtn = (label, href) => { const a = el('a', 'btn', label); a.href = href; return a; };
   const foot = () => {
     const f = el('p', 'foot ui');
     f.append('Anyone may change this; your name stays on your words. ');
     const a = el('a', '', 'About this demo'); a.href = '#/about'; f.append(a);
+    const h = el('a', '', '· ‹ seams home'); h.href = '/'; h.style.marginLeft = '0.4rem';
+    f.append(h);
     return f;
   };
-  const mount = (...nodes) => { app.replaceChildren(...nodes); window.scrollTo(0, 0); };
+  const mount = (...nodes) => { app.replaceChildren(...nodes); app.classList.remove('wide'); hidePop(); window.scrollTo(0, 0); };
 
   async function refresh() { state = await api('/api/state'); return state; }
 
   // ---------- views ----------
   async function viewMain() {
     const map = await verifMap(); await refresh();
-    const meta = el('p', 'meta ui', `Version ${state.v} · ${state.kind === 'revert' ? 'restored by admin' : 'last changed by ' + state.name}, ${ago(state.ts)}`);
-    const mb = verifyBadge(state.name, map); if (mb) meta.append(' ', mb);
     const bar = el('div', 'bar ui');
     const color = btn('Colour by author', () => { colorOn = !colorOn; store.set('color', colorOn ? '1' : '0'); render(); });
     color.setAttribute('aria-pressed', String(colorOn));
-    bar.append(btn('Edit', () => { location.hash = '#/edit'; }, 'primary'), color, linkBtn('Keys', '#/keys'), linkBtn(`Names (${state.authors.length})`, '#/names'), linkBtn('History', '#/history'));
-    mount(withTip(textBlock(state.segs, state.authors, { color: colorOn })), meta, bar, foot());
+    bar.append(btn('Edit', () => { location.hash = '#/edit'; }, 'primary'), color,
+      linkBtn('Deposits', '#/deposits'), linkBtn(`Names (${state.authors.length})`, '#/names'), linkBtn('History', '#/history'));
+    app.classList.add('wide');
+    const left = el('div');
+    // arrival banner: /demo?landed=<hash> (the launcher's "see it land" ends here; the launcher
+    // wiring is a separate wave - the banner refuses to claim confirmation the export hasn't given)
+    const landed = await landedBannerRecognition();
+    if (landed) left.append(landed.banner);
+    const invite = el('p', 'invite', 'Change something. It\u2019ll stick.');
+    left.append(invite, legendStrip());
+    const wa = writingAs();
+    left.append(wa);
+    left.append(withTip(textBlock(state.segs, state.authors, { color: colorOn })));
+    // last-line add (board-1c, mapped onto the one-text-block model): an append lands as
+    // this browser's words, like any other edit - no separate data path, no seeded rows.
+    const addIn = el('input'); addIn.maxLength = 400; addIn.placeholder = 'Add a line at the end\u2026';
+    addIn.setAttribute('aria-label', 'Add a line at the end');
+    const addMsg = el('div');
+    const addBtn = btn('Add', async () => {
+      const t = addIn.value.trim();
+      const nm = wa.input.value.trim();
+      if (!t) { addIn.focus(); return; }
+      if (!nm) { addMsg.replaceChildren(el('p', 'notice err ui', 'Type the name this change carries first (writing as, above).')); wa.input.focus(); return; }
+      addBtn.disabled = true;
+      try {
+        const fresh = await refresh();                                  // base on the newest v
+        const text = fresh.segs.map((s) => s[0]).join('') + (/\n$/.test(fresh.segs.at(-1)[0]) ? '' : '\n') + t + '\n';
+        const r = await post('/api/edit', { name: nm, text, base_v: fresh.v });
+        state = r.state; addIn.value = ''; await viewMain();
+      } catch (e) { addMsg.replaceChildren(el('p', 'notice err ui', e.message)); }
+      addBtn.disabled = false;
+    });
+    const add = el('div', 'addline ui'); add.append(addIn, addBtn); left.append(add, addMsg);
+    const meta = el('p', 'meta ui', `Version ${state.v} · ${state.kind === 'revert' ? 'restored by admin' : 'last changed by ' + state.name}, ${ago(state.ts)}`);
+    const mb = verifyBadge(state.name, map); if (mb) meta.append(' ', mb);
+    left.append(meta, bar, foot());
+    const form = el('div', 'frame'); form.append(left); if (state.authors.length) form.append(namesSide(map));
+    mount(demoHeader(), form);
+    app.classList.add('wide');
   }
 
   async function viewEdit() {
@@ -189,7 +367,7 @@
     const ul = el('ul', 'list ui');
     for (const a of state.authors) {
       const li = el('li'); const link = el('a'); link.href = '#/a/' + encodeURIComponent(a.name);
-      link.append(el('span', `dot a${hueSlot(a.name)}`), el('span', '', a.name),
+      link.append(el('span', `dot a${hueSlot(a.name)}`), el('span', `name a${hueSlot(a.name)}`, a.name),
         el('span', 'sub', `${a.edits} edit${a.edits === 1 ? '' : 's'} · ${a.words} word${a.words === 1 ? '' : 's'} left`));
       const vb = verifyBadge(a.name, map); if (vb) { vb.style.marginLeft = '.5rem'; link.append(vb); }
       li.append(link); ul.append(li);
@@ -266,129 +444,112 @@
       p('This page is a small demonstration of recording who wrote what, which is the attribution part of the Seams protocol. Consent here is simple: anyone may change the text, and nobody is paid.'),
       p('How authorship is worked out: each save is compared word by word with the version before it. Words you keep stay with whoever wrote them; words you type are yours.'),
       el('h2', '', 'Gaps compared with the real protocol'),
-      p('Typed names are not verified, so anyone can use anyone\u2019s name - those entries are claims and stay claims. Real identity work is keys: an author can mint an Ed25519 key (key:ed25519:...) and sign their deposit, and the gateway checks that signature at ingest; signature-checked entries carry a \u2713 and a key fingerprint, verified nowhere else, by anyone else, ever. There are no accounts. If you retype or move someone else\u2019s words, the diff sees new words and credits you. Very small edits can be credited oddly.'),
+      p('Typed names are not verified, so anyone can use anyone\u2019s name - those entries are claims and stay claims. Real identity work is keys: an author mints an Ed25519 keypair with the Seams launcher, on their own machine (this site never mints), signs their deposit, and the gateway checks that signature at ingest; signature-checked entries carry a \u2713 and a key fingerprint, verified nowhere else, by anyone else, ever. There are no accounts. If you retype or move someone else\u2019s words, the diff sees new words and credits you. Very small edits can be credited oddly.'),
       p('Every save is logged and nothing is deleted. An admin can restore an earlier version, which is itself logged. Saves are rate limited.'),
       (() => { const q = el('p', 'ui'); const a = el('a', '', 'Download the full log (JSON)'); a.href = '/api/export'; q.append(a); return q; })());
   }
 
-  // ---------- KEYS: the outside visitor's own key (EOM-KEYS-2026-10-28, owner GO xErah) ----------
-  // The browser is the custody: WebCrypto mints a real Ed25519 pair, the private half stays in
-  // this origin's localStorage (and in the file only YOU download), and the gateway's own reply
-  // is the only source of a verified badge - nothing on this page computes trust. The canonical
-  // bytes below MUST equal canonicalSigningBytes in keys.mjs: same rule, duplicated by design
-  // (sorted keys, no whitespace, JSON scalars); the conformance suite pins the node side.
-  const KEYFILE = 'seam…e-v1';
-  const canon = (v) =>
-    v === null || v === undefined || typeof v !== 'object' ? JSON.stringify(v ?? null)
-      : Array.isArray(v) ? '[' + v.map(canon).join(',') + ']'
-        : '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + canon(v[k])).join(',') + '}';
-  const toB64 = (buf) => { let s = ''; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); };
-  const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
-  const PRIV_PKCS8_PREFIX = Uint8Array.from('302e020100300506032b657004220420'.match(/../g).map((h) => parseInt(h, 16)));
-  async function edSupported() {
-    try { const k = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']); return !!(k && k.privateKey); } catch { return false; }
-  }
-  async function myKey() {
-    const raw = store.get(KEYFILE);
-    if (!raw) return null;
-    try {
-      const kf = JSON.parse(raw);
-      if (!kf || kf.v !== 1 || !/^key:ed25519:[A-Za-z0-9+/]{43}=$/.test(String(kf.node_key || '')) || typeof kf.priv_b64 !== 'string') return null;
-      const seed = fromB64(kf.priv_b64);
-      if (seed.length !== 32) return null;
-      const der = new Uint8Array(PRIV_PKCS8_PREFIX.length + 32); der.set(PRIV_PKCS8_PREFIX); der.set(seed, PRIV_PKCS8_PREFIX.length);
-      const priv = await crypto.subtle.importKey('pkcs8', der, 'Ed25519', false, ['sign']);
-      return { nodeKey: kf.node_key, priv, fileText: raw };
-    } catch { return null; }
-  }
-  async function mintKey() {
-    const pair = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
-    const pubRaw = await crypto.subtle.exportKey('raw', pair.publicKey);
-    const der = await crypto.subtle.exportKey('pkcs8', pair.privateKey);
-    const derU = new Uint8Array(der);
-    const kf = { v: 1, node_key: 'key:ed25519:' + toB64(pubRaw), priv_b64: toB64(derU.subarray(derU.length - 32)) };
-    store.set(KEYFILE, JSON.stringify(kf));
-    return kf;
-  }
-  async function signWith(priv, body) { return toB64(await crypto.subtle.sign('Ed25519', priv, new TextEncoder().encode(canon(body)))); }
-
-  async function viewKeys() {
-    const head = [nav('#/', '← Back'), el('h2', '', 'Your key')];
-    if (!(await edSupported())) {
-      mount(...head, el('p', 'notice err ui', 'This browser has no WebCrypto Ed25519 - try a current Chrome, Safari, or Firefox. Nothing was minted.'));
-      return;
-    }
-    if (!store.get(KEYFILE)) {
-      mount(...head,
-        el('p', 'ui', 'A key is an identity the gateway can CHECK, not a name it trusts. Mint a real Ed25519 keypair in this browser: the private half stays here (plus a file only you download), the gateway verifies your signature at ingest, and a checked deposit carries \u2713 verified - verified at that moment, for those bytes, nothing more. No accounts, no recovery: lose the key, lose the name.'),
-        (() => { const r = el('div', 'bar ui'); r.append(btn('Mint my key', async () => {
-          try { await mintKey(); render(); } catch (e) { mount(...head, el('p', 'notice err ui', 'Mint failed: ' + e.message)); }
-        }, 'primary')); return r; })());
-      return;
-    }
-    let kf;
-    try { kf = JSON.parse(store.get(KEYFILE)); } catch { store.set(KEYFILE, ''); render(); return; }
-    const mine = await myKey();
-    if (!mine) {
-      const redo = (() => { const r = el('div', 'bar ui'); r.append(btn('Mint a new key', async () => { store.set(KEYFILE, ''); await mintKey(); render(); }, 'primary')); return r; })();
-      mount(...head, el('p', 'notice err ui', 'The stored key file failed its own checks (shape, or private half not matching the public half). Nothing sends with a broken key - mint a new one.'), redo, foot());
-      return;
-    }
-    const fp = kf.node_key.slice(12, 20);
-    let status = null;
-    try { status = await api('/api/deposits?node_key=' + encodeURIComponent(kf.node_key)); } catch { /* gateway quiet: stay honest, never assume */ }
-    const keyLine = el('p', 'meta ui', kf.node_key.slice(0, 24) + '\u2026' + kf.node_key.slice(-6) + ' \u00b7 fingerprint ' + fp);
-    const statusLine = el('p', 'meta ui', status === null ? 'Gateway status unknown right now - nothing is assumed.'
-      : status.registered ? `Registered with the gateway \u00b7 ${status.count} deposit${status.count === 1 ? '' : 's'} \u00b7 registry verified: ${status.registry && status.registry.verified ? '\u2713 true' : 'false (claim)'}`
-        : 'Not registered yet - announce it (below) to turn your key into a registered identity.');
-    const who = el('input'); who.maxLength = 40; who.placeholder = 'Name to register (optional)'; who.value = store.get('name') || '';
-    const out = el('div');
-    const say = (t, err) => { out.replaceChildren(el('p', 'notice' + (err ? ' err' : '') + ' ui', t)); };
-    const sendBtn = btn('Announce (register)', async () => {
-      sendBtn.disabled = true;
-      try {
-        const body = { op: 'emit', kind: 'node-key', node_key: kf.node_key };
-        if (who.value.trim()) body.provenance = { attributed_to: { name: who.value.trim() } };
-        body.sig = await signWith(mine.priv, body);
-        const r = await post('/api/ingest', body);
-        say('Gateway answer: ' + (r.status === 'deposited' ? 'deposited' : r.status) + (r.duplicate ? ' (replay of the same announce)' : '') + ' \u00b7 verified: ' + (r.verified === true ? '\u2713 true - the gateway checked your signature against your key' : 'false (claim)') + ' \u00b7 receipt ' + r.receipt);
-        statusLine.textContent = 'Registered with the gateway \u00b7 registry verified: ' + (r.verified === true ? '\u2713 true' : 'false (claim)');
-      } catch (e) { say(e.message, true); }
-      sendBtn.disabled = false;
-    }, 'primary');
-    const hello = el('input'); hello.maxLength = 200; hello.placeholder = 'Say something, signed';
-    const helloBtn = btn('Sign my first deposit', async () => {
-      helloBtn.disabled = true;
-      try {
-        const t = hello.value.trim();
-        if (!t) { say('Type something first.', true); helloBtn.disabled = false; return; }
-        const body = { op: 'emit', kind: 'session-log', node_key: kf.node_key, text: t, provenance: { origin: 'authored' } };
-        body.sig = await signWith(mine.priv, body);
-        const r = await post('/api/ingest', body);
-        say(r.status === 'deposited' ? `Deposited v${r.v} \u00b7 creator_verified: ${r.creator_verified === true ? '\u2713 true' : 'false (claim)'} \u00b7 fingerprint ${r.node_key_fingerprint || 'none'} \u00b7 receipt ${r.receipt}${r.duplicate ? ' (replay: identical bytes were already in the log)' : ''}` : 'Answer: ' + JSON.stringify(r));
-      } catch (e) { say((e.body && e.body.message) || e.message, true); }
-      helloBtn.disabled = false;
-    });
-    const dl = el('a', 'btn', 'Download key file');
-    dl.href = URL.createObjectURL(new Blob([mine.fileText], { type: 'application/json' }));
-    dl.download = 'seams-node-key-' + fp + '.json';
-    const bar = el('div', 'bar ui');
-    bar.append(sendBtn, dl, btn('Forget on this device', () => {
-      if (confirm('Forget this key on this device? The log keeps what it deposited - the key cannot be recovered, and neither can the name.')) { store.set(KEYFILE, ''); render(); }
-    }));
-    mount(...head,
-      el('p', 'ui', 'This is YOUR key: generated here, held here. The private half leaves only through the download, and signatures are the only thing it ever produces.'),
-      keyLine, statusLine,
-      el('label', 'ui', 'Register (announce is self-signed; signing it is what proves you hold the private half).'), who, bar, out,
-      el('label', 'ui', 'Signed deposit (the gateway checks it at its gate - a bad signature deposits nothing).'), hello,
-      (() => { const r = el('div', 'bar ui'); r.append(helloBtn); return r; })(),
-      foot());
-  }
-
+  // Browser key minting is REMOVED (design handoff 2026-10-28, owner-dictated: "REMOVE browser
+  // mint from the site entirely. The launcher is the one story"). Keys are minted only by the
+  // launcher on the user's machine; the demo's deposits views (above) are the identity surface
+  // the boards kept. Nothing on this page mints, holds, or intermediates identity.
   function viewAdmin() {
     const i = el('input'); i.placeholder = 'Admin token'; i.type = 'password'; i.value = store.get('admin') || '';
     mount(nav('#/', '← Back'), el('h2', '', 'Admin'), el('p', 'ui', 'Paste the token to see “Restore this version” on old versions.'), i,
       (() => { const r = el('div', 'bar ui'); r.style.marginTop = '1rem'; r.append(btn('Save token', () => { store.set('admin', i.value.trim()); location.hash = '#/history'; }, 'primary'), btn('Forget it', () => { store.set('admin', ''); i.value = ''; })); return r; })());
+  }
+
+  // ---------- deposits (site-impl board-1c, EOM-SITE-IMPL-2026-10-28) ----------
+  // The browser-mint key view is REMOVED (design handoff 2026-10-28: keys are minted only by the
+  // launcher on the user's machine; the site never mints). In its place, the view the boards kept:
+  // what every depositing key has deposited - driven end to end by the public export truth.
+  const keyDisplay = (ref) => {
+    if (isEdKey(ref)) { const fp = ref.slice(12, 20); return `key · ${fp}`; }
+    return String(ref);
+  };
+  async function viewDeposits() {
+    let x = null;
+    try { x = await exportX(); } catch { /* quiet gateway: say so, never assume */ }
+    const parts = [nav('#/', '← Back'), el('h2', '', 'Deposits'),
+      el('p', 'meta ui', 'Every key and name that ever deposited on this node, with its honest state. The truth is the export; this page only reads it.')];
+    if (!x) {
+      parts.push(el('p', 'notice err ui', 'The gateway is not answering right now - no deposits shown, none invented. Try again in a moment.'));
+    } else {
+      const keys = [];
+      const byRef = new Map();
+      for (const e of x.entries) {
+        const ref = typeof e.creator_ref === 'string' ? e.creator_ref : String(e.name || 'unknown');
+        if (!byRef.has(ref)) byRef.set(ref, { ref, count: 0, verified: e.creator_verified === true, fp: e.node_key_fingerprint || '', lastTs: e.ts });
+        const row = byRef.get(ref);
+        row.count++;
+        if (e.creator_verified === true) row.verified = true;
+        if (ref.startsWith('key:ed25519:') && e.node_key_fingerprint) row.fp = e.node_key_fingerprint;
+        if (typeof e.ts === 'string' && e.ts > row.lastTs) row.lastTs = e.ts;
+      }
+      for (const row of byRef.values()) keys.push(row);
+      keys.sort((a, b) => (a.verified === b.verified ? b.lastTs.localeCompare(a.lastTs) : a.lastTs < b.lastTs ? 1 : -1));
+      const lint = el('p', 'meta ui', `${x.entries.length} landings on the log · integrity ${x.integrity && x.integrity.ok ? 'ok' : 'QUARANTINED'} · wire ${x.wire}`);
+      parts.push(lint, el('div', ''));
+      const ul = el('ul', 'dcards');
+      for (const k of keys) {
+        const li = el('li');
+        const a = el('a'); a.href = '#/d/' + encodeURIComponent(k.ref);
+        const badge = el('span', k.verified ? 'vbadge' : 'claimtag', isEdKey(k.ref) ? (k.verified ? `✓ verified · ${k.fp}` : 'claim') : (k.verified ? '✓ verified · ' + k.fp : 'claim'));
+        const who = el('span', '', isEdKey(k.ref) ? `key · ${k.fp}` : k.ref.replace(/^name:/, ''));
+        const sub = el('span', 'sub', `${k.count} deposit${k.count === 1 ? '' : 's'} · last ${ago(k.lastTs)}`);
+        a.append(who, badge, sub); li.append(a); ul.append(li);
+      }
+      parts.push(ul);
+    }
+    parts.push(foot());
+    mount(...parts);
+  }
+  async function viewDepositsOne(ref) {
+    // one view for both shapes: key refs mirror the public /api/deposits?node_key= truth,
+    // name refs filter the same export (- the only public bytes there are).
+    let x = null;
+    try { x = await exportX(); } catch { /* quiet gateway: say so, never assume */ }
+    const head = el('h2', '', typeof ref === 'string' && ref.startsWith('name:') ? ref.slice(5) : keyDisplay(ref));
+    if (!x) {
+      mount(nav('#/', '← Back'), nav('#/deposits', '← All deposits'), head,
+        el('p', 'notice err ui', 'The gateway is not answering right now - nothing shown, nothing invented. Try again in a moment.'), foot());
+      return;
+    }
+    const entries = (x.entries || []).filter((e) => e.creator_ref === ref);
+    let verified = false, fp = '';
+    for (const e of entries) {
+      if (e.creator_verified === true) { verified = true; fp = e.node_key_fingerprint || fp; }
+    }
+    const reg = (x.nodes || []).find((n) => n.node_key === ref);
+    if (reg && reg.verified) verified = true;
+    const badge = el('span', verified ? 'vbadge' : 'claimtag',
+      verified ? `✓ verified${fp ? ' · ' + fp : ''}` : 'claim');
+    badge.title = verified
+      ? 'creator_verified true: the gateway checked this key’s Ed25519 signature at ingest. No third party verified anything.'
+      : 'No signature was verified for this creator - a claim, forever visible as one.';
+    const isKeyRef = typeof ref === 'string' && ref.startsWith('key:');
+    const meta = el('p', 'meta ui',
+      `${entries.length} landing${entries.length === 1 ? '' : 's'} · integrity ${x.integrity && x.integrity.ok ? 'ok' : 'QUARANTINED'} · wire ${x.wire}`);
+    if (isKeyRef) {
+      const a = el('a', '', 'machine view: /api/deposits');
+      a.href = '/api/deposits?node_key=' + encodeURIComponent(ref);
+      meta.append(el('span', '', ' · '), a);
+    }
+    const ul = el('ul', 'dfeed');
+    for (const e of [...entries].sort((a, b) => String(b.ts).localeCompare(String(a.ts)))) {
+      const li = el('li');
+      const when = el('span', 'when', `v${e.v} · ${e.kind ? e.kind : ''} · ${ago(e.ts)}${e.creator_verified === true ? ' · ✓ verified' : ' · claim'}`);
+      const text = el('span', '', snippetOfEntry(e));
+      li.append(when, text); ul.append(li);
+    }
+    if (!entries.length) ul.append(el('li', '', 'No deposits by this creator yet - absence of deposits is an honest answer.'));
+    mount(nav('#/', '← Back'), nav('#/deposits', '← All deposits'), head, badge, el('div', ''), meta, ul, foot());
+  }
+  // honest one-line snippet derived from the entry's own fields (shared with the homepage rule)
+  function snippetOfEntry(e) {
+    if (typeof e.text === 'string' && e.text.trim()) return e.text;
+    if (e.kind === 'node-key') return 'announced a key';
+    return 'kind: ' + (e.kind || 'unknown');
   }
 
   // ---------- routing ----------
@@ -402,8 +563,9 @@
       else if (h === '/names') await viewNames();
       else if (h === '/history') await viewHistory();
       else if (h === '/about') viewAbout();
-      else if (h === '/keys') await viewKeys();
+      else if (h === '/deposits') await viewDeposits();
       else if (h === '/admin') viewAdmin();
+      else if ((m = h.match(/^\/d\/(.+)$/))) await viewDepositsOne(decodeURIComponent(m[1]));
       else if ((m = h.match(/^\/a\/(.+)$/))) await viewAuthor(decodeURIComponent(m[1]));
       else if ((m = h.match(/^\/v\/(\d+)$/))) await viewVersion(Number(m[1]));
       else location.hash = '#/';

@@ -62,10 +62,10 @@ function charge(bucket) {
 setInterval(() => { const now = Date.now(); for (const [k, a] of hits) if (!a.some((t) => now - t < WINDOW_MS)) hits.delete(k); }, 60000).unref();
 const socketIp = (req) => req.socket.remoteAddress || 'unknown-socket';
 
-// The go-public pass (2026-10-28) split the front door: '/' is the protocol LANDING page (the honest
-// human window - what Seams is/is-not, how to join, the live hello-worlds); the attributed-text
-// editor rides at '/text'. Static bytes are deterministic; no inline script (CSP script-src 'self').
-const STATIC = { '/': ['landing.html', 'text/html; charset=utf-8'], '/text': ['index.html', 'text/html; charset=utf-8'], '/demo': ['index.html', 'text/html; charset=utf-8'], '/attributed-text': ['index.html', 'text/html; charset=utf-8'], '/index.html': ['index.html', 'text/html; charset=utf-8'], '/landing.js': ['landing.js', 'text/javascript; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/app.css': ['app.css', 'text/css; charset=utf-8'] };
+// Site-impl wave (2026-10-28): '/' is the HOMEPAGE (board-1a/1b; live window + spine + grid +
+// launcher card), the demo rides at '/demo' (and '/text'), and the old honest node-landing
+// moves to '/protocol'. Static bytes are deterministic; no inline script (CSP script-src 'self').
+const STATIC = { '/': ['home.html', 'text/html; charset=utf-8'], '/text': ['index.html', 'text/html; charset=utf-8'], '/demo': ['index.html', 'text/html; charset=utf-8'], '/attributed-text': ['index.html', 'text/html; charset=utf-8'], '/index.html': ['index.html', 'text/html; charset=utf-8'], '/protocol': ['landing.html', 'text/html; charset=utf-8'], '/home.js': ['home.js', 'text/javascript; charset=utf-8'], '/landing.js': ['landing.js', 'text/javascript; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/app.css': ['app.css', 'text/css; charset=utf-8'] };
 const HEADERS = {
   'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store',

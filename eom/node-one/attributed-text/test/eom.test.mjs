@@ -267,26 +267,41 @@ test('server F4: non-loopback BIND_HOST REFUSES TO BOOT naming the escape hatch;
   try { assert.match(out(), /loopback bind/); } finally { c.stop(); }
 });
 
-test('server: / is the honest landing page; the editor lives at /text; landing.js served; landing makes no verified/payments/vouch claims', async () => {
+test('server: / is the HOMEPAGE (site-impl boards 1a/1b); the node landing stays reachable at /protocol; landing.js + home.js served; the homepage makes no verified/payments/vouch/mint claims', async () => {
   const srv = startServer(); const { base } = await srv.ready;
   try {
     const home = await fetch(base + '/');
     assert.equal(home.status, 200);
     assert.match(home.headers.get('content-type'), /text\/html/);
     const h = await home.text();
-    assert.match(h, /What this node is not/, 'the honest IS/IS-NOT list is the landing page spine');
+    // the honest spine survives the homepage rework: IS / IS-NOT cells, non-verification in
+    // words, no-payments, no-vouches - placeable by a gift-level skeptic in one breath
+    assert.match(h, /What this is not/, 'the IS/IS-NOT explanation grid is the homepage spine');
     for (const re of [/payments?\s*(accepted|enabled|processed|due)/i, /we\s+(charge|bill)|pricing\s+plan|paid\s+(plan|tier)|invoice\s+you|get\s+paid/i, /verified:\s*true|verified\s+by\s+(cloudflare|seams)/i]) {
-      assert.doesNotMatch(h, re, 'landing page must never make an affirmative commercial/verification claim: ' + re);
+      assert.doesNotMatch(h, re, 'homepage must never make an affirmative commercial/verification claim: ' + re);
     }
-    assert.match(h, /Not verified by any third party|Not verified by anyone|No one has verified/i, 'and it states non-verification in words (KEYS pass 2026-10-28: signature checks exist, by THIS gateway only; no third party ever verifies anything)');
+    assert.match(h, /No third party has verified anything|Not verified by any third party|No one has verified/i, 'it states non-verification in words');
     assert.match(h, /No payments|no pricing/i, 'and it states no-payments in words');
     assert.match(h, /No vouches/i, 'and it states no-vouches in words');
-    const ed = await fetch(base + '/text');
-    assert.equal(ed.status, 200, 'the editor moved to /text (protocol keeps /)');
-    assert.match((await ed.text()), /One page|with attribution/i, 'the editor page still serves its content');
-    assert.ok(!h.includes('One page of text, with attribution</title>') , 'the editor HTML itself is no longer at /');
-    const js = await fetch(base + '/landing.js');
+    assert.match(h, /Names here are claims\. Keys here are proof\./, 'the copy spine is on the page (board-1a)');
+    assert.match(h, /github\.com\/xoeieox\/seams/, 'the GitHub link is the real repo (no fake target)');
+    assert.match(h, /Node 18\+/, 'the launcher card pairs its CTA with the honest Node one-liner');
+    assert.match(h, /No packaged download yet/i, 'and admits the packaged app does not exist yet (no fake download)');
+    assert.doesNotMatch(h, /\bmint\s+(my|a)\s+key\b|href=["'][^"']*[#\/]keys/i, 'no browser mint tab or mint CTA on the homepage (launcher is the one story)');
+    const js = await fetch(base + '/home.js');
     assert.equal(js.status, 200); assert.match(js.headers.get('content-type'), /javascript/);
+    // the old node landing keeps its spine, at /protocol now
+    const proto = await fetch(base + '/protocol');
+    assert.equal(proto.status, 200, 'the protocol landing moved to /protocol, still reachable');
+    const ph = await proto.text();
+    assert.match(ph, /What this node is not/, 'the honest node IS/IS-NOT list still exists');
+    assert.match(ph, /Not verified by any third party|Not verified by anyone|No one has verified/i, 'and its non-verification words survived the move');
+    const lpjs = await fetch(base + '/landing.js');
+    assert.equal(lpjs.status, 200); assert.match(lpjs.headers.get('content-type'), /javascript/);
+    const ed = await fetch(base + '/text');
+    assert.equal(ed.status, 200, 'the editor lives at /text');
+    assert.match((await ed.text()), /One page|with attribution/i, 'the editor page still serves its content');
+    assert.ok(!h.includes('One page of text, with attribution</title>'), 'the editor HTML itself is not at /');
   } finally { srv.stop(); }
 });
 
