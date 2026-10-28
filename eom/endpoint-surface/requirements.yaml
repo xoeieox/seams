@@ -11,7 +11,11 @@
 
 surface: eom/node-one/attributed-text
 wire: seams-wire/0.3-draft
-format: seams-attribution-log/0-eom.1
+# KEYS pass (EOM-KEYS-2026-10-28, owner GO xErah 12:03 PDT): format bumped 0-eom.1 -> 0-eom.2
+# because export gains the verified-attribution fields (creator_verified true is now machine-made,
+# node_key_fingerprint added) - a shape change is a new format id, and the tunnel fingerprint pin
+# (eom/endpoint-surface/cloudflared/verify-tunnel-fingerprint.sh) moves in the SAME commit.
+format: seams-attribution-log/0-eom.2
 
 endpoints:
   hello:
@@ -64,7 +68,18 @@ endpoints:
       - id: REQ-EXPORT-4
         rule: corrupt (unparseable) lines go to quarantine.jsonl at load; boot never crashes on them (A2 spirit) and they never silently vanish from the audit trail
       - id: REQ-EXPORT-5
-        rule: hashes stay opaque placeholders (sha256 with a load-stable salt) until the deposits-spec ruling fixes their definition; creator_verified stays false until the identity/keys ruling lands
+        rule: hashes stay opaque placeholders (sha256 with a load-stable salt) until the deposits-spec ruling fixes their definition; creator_verified is machine-made from the signature check (REQ-SIGN-4) - an unsigned or typed-name deposit is a claim and stays false
+  deposits:
+    method: GET
+    path: /api/deposits?node_key=...
+    purpose: the public "what did THIS key deposit" view - a filtered read of export (EOM-KEYS-2026-10-28)
+    requirements:
+      - id: REQ-DEP-1
+        rule: public exactly like export is public (ruled 2026-10-26); rides the read tier; refuses 503 log_integrity like export does
+      - id: REQ-DEP-2
+        rule: missing or malformed node_key refuses bad_node_key (400); a well-formed but unknown key answers count 0 - absence of deposits is an honest answer, not a 404
+      - id: REQ-DEP-3
+        rule: response carries format, wire, the queried node_key, the registry record (or null), count, and the matching export entries verbatim (same creator_verified / node_key_fingerprint truth as export; no IPs, ever)
 
 join_gate:
   accept_kinds: [node-key, session-log]
@@ -75,11 +90,38 @@ join_gate:
     - unknown kind (unknown_kind, 400) - including transport-flavored kinds and text-with-header shapes
     - op other than emit (unknown_op, 400)
     - malformed node_key (bad_node_key, 400)
+    - present-but-invalid signature, signature on a non-ed25519 node_key, or malformed sig field (bad_signature, 400) - refused AT THE GATE, nothing deposits and NOTHING quarantines: quarantine is for a corrupted log, not for someone else's bad signature (REQ-SIGN-3)
     - derivation fork/remix (consent_gate_unbuilt, 501)
     - parents on an original (parents_on_original, 400)
     - provenance.origin outside authored|assisted|played (bad_origin, 400)
     - cross-key replay of identical bytes (already_deposited, 409)
     - empty or over-long content (empty 400 / too_long 413), oversize body (too_big 413), bad base64 (bad_content 400)
+  # ------------------------------------------------------------------------
+  # REQ-SIGN - the KEYS pass (EOM-KEYS-2026-10-28, owner GO xErah 12:03 PDT).
+  # The canonical signing body is PINNED here; keys.mjs is the pinned
+  # implementation (node:crypto ed25519 only). Changing any rule below is a
+  # wire decision (consequence), not a code edit.
+  # ------------------------------------------------------------------------
+  signing:
+    key_format:
+      - "id: REQ-SIGN-1a"
+      - rule: "a verifying node key is exactly key:ed25519:<base64> where base64 is the RAW 32-byte Ed25519 public key (always 43 base64 chars + one '=' pad); the key is embedded in node_key itself - the gateway never looks up a key registry to find what to verify against"
+      - rule: "legacy ref keys (key:<ref>, [A-Za-z0-9._-]) stay legal and stay CLAIMS: they can never carry a signature and never verify"
+    canonical_body:
+      - "id: REQ-SIGN-1"
+      - rule: "the signed bytes are the CANONICAL JSON of the whole ingest body MINUS the sig field, encoded UTF-8: object keys sorted recursively by codepoint, arrays order-preserving, no whitespace (the same canonicalization the payload hash uses; keys.mjs duplicates it and a unit test pins the two together - drift fails the suite)"
+      - rule: "sig is never signed-over and never canonicalized into its own preimage; body.sig is the base64 Ed25519 signature (64 bytes, 88 base64 chars) over those bytes"
+    verify_at_ingest:
+      - "id: REQ-SIGN-2"
+      - rule: "verification happens at the GATE, before anything is stored: the gateway checks sig against the public key embedded in node_key over the canonical body; verification runs on every signed emit AND on node-key registration (self-signed announce)"
+      - "id: REQ-SIGN-3"
+      - rule: "fail-closed refusal semantics: present-but-bad sig (including sig on a non-ed25519 node_key, non-base64, or wrong length) refuses bad_signature (400) and deposits NOTHING - no log line, no receipt, no registry entry, no quarantine entry; the verify path answers true/false only and never explains why, so a refusal cannot become an oracle"
+      - "id: REQ-SIGN-4"
+      - rule: "creator_verified truth: true iff (a) the gateway verified the signature at ingest and (b) the node_key was already registered (announce first, then emit); anything else - including a valid sig from an unregistered key - deposits as a claim with creator_verified false; verified is monotone in the registry (an unsigned re-announce never un-verifies a verified key); ABSENCE of sig stays legal and is always a claim (creator_verified false) - signing is opt-in truth, never a paywall or a ceremony"
+      - "id: REQ-SIGN-5"
+      - rule: "node_key_fingerprint is the first 8 characters of the base64 public half (null for non-ed25519 keys); it is display/analytics material only - verification always uses the full embedded key"
+      - "id: REQ-SIGN-6"
+      - rule: "no ceremony, no custody: keys are disposable, there is no KMS, no revocation list, no vouch chain; what a verified entry proves is control of the private half at ingest time and NOTHING ELSE - not identity, not trust, not permanence (the private key lives outside the repo tree at 0600 with its owner)"
   rate:
     keying: socket peer address ONLY - cf-connecting-ip / x-forwarded-for are attacker-controlled and never read (T1 lesson, smoke 2026-10-26)
     burn_policy: validation/gate refusals and store rejections do not consume budget; only successful mutations charge (peek/charge split); the same split governs the read tier - 404/429/503 responses charge nothing, successful reads (<400) charge the read bucket only

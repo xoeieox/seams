@@ -21,10 +21,11 @@ set -euo pipefail
 URL_BASE="${1:-https://seams.fyi}"
 # PINNED wire fingerprint - the values the shipped binary answers with. If node-one legitimately
 # bumps its wire version, update this line in the same commit (conformance test REQ-HELLO-1 pins
-# the same value tree-side; the two must never drift).
+# the same value tree-side; the two must never drift). KEYS pass 2026-10-28: format moved
+# 0-eom.1 -> 0-eom.2 with the verified-attribution fields, per the same-commit rule of this line.
 PIN_WIRE="seams-wire/0.3-draft"
 PIN_NODE="node-one"
-PIN_FORMAT="seams-attribution-log/0-eom.1"
+PIN_FORMAT="seams-attribution-log/0-eom.2"
 KINDS="node-key session-log"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
