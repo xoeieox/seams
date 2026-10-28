@@ -41,7 +41,7 @@ textarea:focus, input:focus { outline: 2px solid var(--muted); outline-offset: 1
 .hl { background: hsl(var(--h) var(--s) var(--l)); }
 .a0 { --h: 210; } .a1 { --h: 38; } .a2 { --h: 330; } .a3 { --h: 150; } .a4 { --h: 268; }
 .a5 { --h: 12; } .a6 { --h: 182; } .a7 { --h: 62; } .a8 { --h: 300; } .a9 { --h: 100; }
-.alt .seg, .alt.chip { text-decoration: underline dotted; text-underline-offset: 4px; }
+.alt .seg, .alt.seg, .alt.chip { text-decoration: underline dotted; text-underline-offset: 4px; }
 .who { position: fixed; left: 50%; transform: translateX(-50%); width: calc(100% - 2.5rem); bottom: 0.75rem; box-shadow: 0 2px 12px rgba(0,0,0,.15); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.55rem 0.8rem; font-size: 0.85rem; max-width: 30rem; text-align: center; }
 .who[hidden] { display: none; }
 

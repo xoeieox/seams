@@ -1,7 +1,6 @@
 (() => {
   'use strict';
   const app = document.getElementById('app');
-  const NCOLORS = 10;
   let state = null;                 // current text + authors
   let colorOn = false;
   let draft = null;                 // unsaved edit text survives view changes
@@ -30,10 +29,33 @@
     if (s < 30 * 86400) return `${Math.floor(s / 86400)} d ago`;
     return new Date(iso).toLocaleDateString();
   };
+  // ===== HUE-CONTRACT-BEGIN (EOM-DEMO-UI-FIXWAVE-2026-10-28, Leg 1 - extracted verbatim by
+  // test/hue.test.mjs and run in node: what the browser ships is what the suite certifies.
+  // These functions are DOM-free and POSITION-free by contract - hue derives from author
+  // identity alone and is stable everywhere and forever; the old positional rule (hue = the
+  // author's place in a locally built list, mod ten) re-mapped authors under set churn and
+  // let two distinct names render one hue.) =====
+  const HUE_NC = 10;
+  // Identity for the hue: the strongest stable identity in the name. For an ed25519 author that
+  // is the base64 public half ITSELF (the full key, not the 8-char display fingerprint - keys
+  // sharing a fingerprint still keep distinguishable hues; the verified badge is the second
+  // token for checked rows). Keyless names hash on the name string. Same slot space for both.
+  const hueIdentity = (name) => (typeof name === 'string' && name.startsWith('key:ed25519:') ? name.slice(12) : String(name));
+  // FNV-1a 32-bit: pure, stateless, no position, no view memory - the same author lands in the
+  // same hue class in every view, in every browser, forever.
+  const hueHash = (s) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h >>> 0; };
+  const hueSlot = (name) => hueHash(hueIdentity(name)) % HUE_NC;
+  // One author's class in one view: the identity slot, plus the `.alt` dotted-underline
+  // fallback when ANOTHER author in this view shares the slot (hash collision). Symmetric and
+  // order-free - collision is a property of the slot, never of anyone's position.
   const colorClass = (authors, name) => {
     const a = authors.find((x) => x.name === name);
-    return a ? `a${a.idx % NCOLORS}${a.idx >= NCOLORS ? ' alt' : ''}` : 'a0';
+    if (!a) return 'a0';
+    const slot = hueSlot(a.name);
+    const collides = authors.some((x) => x !== a && hueSlot(x.name) === slot);
+    return `a${slot}${collides ? ' alt' : ''}`;
   };
+  // ===== HUE-CONTRACT-END =====
   const short = (t) => (t.length > 220 ? t.slice(0, 100) + ' … ' + t.slice(-100) : t);
 
   // KEYS demo (EOM-KEYS-2026-10-28): verified ✓ + fingerprint come from ONE source - the export's
@@ -167,7 +189,7 @@
     const ul = el('ul', 'list ui');
     for (const a of state.authors) {
       const li = el('li'); const link = el('a'); link.href = '#/a/' + encodeURIComponent(a.name);
-      link.append(el('span', `dot a${a.idx % NCOLORS}`), el('span', '', a.name),
+      link.append(el('span', `dot a${hueSlot(a.name)}`), el('span', '', a.name),
         el('span', 'sub', `${a.edits} edit${a.edits === 1 ? '' : 's'} · ${a.words} word${a.words === 1 ? '' : 's'} left`));
       const vb = verifyBadge(a.name, map); if (vb) { vb.style.marginLeft = '.5rem'; link.append(vb); }
       li.append(link); ul.append(li);
@@ -192,7 +214,7 @@
   async function viewAuthor(name) {
     const map = await verifMap();
     const l = await api('/api/author/' + encodeURIComponent(name));
-    const a = l.author, head = el('h2', '', ''); head.append(el('span', `dot a${a.idx % NCOLORS}`), ' ' + a.name);
+    const a = l.author, head = el('h2', '', ''); head.append(el('span', `dot a${hueSlot(a.name)}`), ' ' + a.name);
     const vb = verifyBadge(a.name, map); if (vb) { vb.style.marginLeft = '.5rem'; head.append(vb); }
     const parts = [nav('#/names', '← Names'), head,
       el('p', 'meta ui', `${a.edits} edit${a.edits === 1 ? '' : 's'}, ${a.words} of their words are still in the text. Highlighted below.`),
