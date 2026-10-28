@@ -173,3 +173,75 @@ cloudflared tunnel --config ~/.cloudflared/seams-config.yaml run
 - Multi-posture (second path off Cloudflare so no single vendor holds a kill-switch):
   the later requirement per the Switter lesson; the demo tunnel is plumbing we must be
   able to walk away from, and the teardown drill above is the muscle for that.
+
+## CUTOVER - 2026-10-28 ~10:55-11:15 PDT (dashboard-managed token cutover, Erah GO)
+
+Cutover EXECUTED on the dashboard-managed seam (Erah-authorized; tunnel created in his
+Zero Trust UI, run token supplied 10:51, seams.fyi hostname being added by Erah ~10:52).
+The prior `cloudflared tunnel login` + keeper path is SUPERSEDED: no cert.pem, no local
+tunnel config, no DNS route command - the connector runs TOKEN-MODE and ingress comes
+from the dashboard.
+
+- **Stale machinery:** `pkill -f cf-login-keeper2.sh` and `pkill -f 'cloudflared tunnel login'` -
+  both rc=1 (NO MATCHES): the possibly-stuck prior session's processes were already gone;
+  ps clean before this run. No kills needed, none performed.
+- **Binary:** `/usr/local/bin/cloudflared` 2026.10.5 (built 2026-10-27) VERIFIED present;
+  the dashboard's apt-install snippet deliberately NOT run (would have replaced the pinned,
+  cmp-verified binary e1bc0cf0...).
+- **Origin (F1 dedicated port):** demo node-one pid 2833054,
+  `/data/git/seams-working/eom/node-one/attributed-text/server.mjs`, env-verified
+  `NODE_ONE_PORT=18080 NODE_ONE_DATA_DIR=/var/tmp/eom-demo/n1` (out-of-tree), boot 10:10:33
+  via the launcher; `ss` shows `127.0.0.1:18080` LISTEN loopback-ONLY. No re-boot needed.
+  Loopback `/api/hello` answers the node-one wire JSON; `/` 200 with the "What this node is
+  not" landing; `/api/export` 200.
+- **Token:** used exactly once. Stored 0600 out-of-tree at
+  `/home/jellyfish/.cloudflared/dashboard-token` (184 bytes, jellyfish:jellyfish). The
+  literal crossed chat->0600-file once and was NEVER echoed into any log, report, git
+  object, or room. It never entered cloudflared's argv: the unit passes
+  `--token-file ~/.cloudflared/dashboard-token` (accepted-process-args exposure eliminated
+  via the token-file flag).
+- **Connector (supervised, survives ssh):** systemd-USER unit
+  `~/.config/systemd/user/cloudflared-seams.service` (new; enabled; WantedBy=default.target;
+  Restart=on-failure RestartSec=5; StartLimitIntervalSec=0 - aci-serve trio convention;
+  linger=yes), ExecStart
+  `/usr/local/bin/cloudflared tunnel --no-autoupdate run --token-file /home/jellyfish/.cloudflared/dashboard-token`.
+  Log path: `/home/jellyfish/logs/cloudflared-seams.log` (append; journal: `journalctl --user -u cloudflared-seams`).
+  MainPID 3052698 (start 11:01:12 PDT after one arg-order fix: `--no-autoupdate` is a
+  `tunnel`-level flag, must precede `run`); log shows precheck all-pass and 4x "Registered
+  tunnel connection" (lax12/san01, quic).
+- **Fingerprint pin fix (keeper F1 script):** `verify-tunnel-fingerprint.sh` pinned
+  `PIN_WIRE="0-eom.1"` - a copy of the FORMAT suffix, wrong per the shipped tree
+  (requirements.yaml `wire: seams-wire/0.3-draft`; REQ-HELLO-1 parses that same value;
+  origin answers exactly that). Against the honest live origin the script FAILED on the
+  wire check only (all other pins + the qBittorrent 'Not Found' negative guard matched).
+  Pin aligned to the tree-pinned value per the script's own update rule; commit 23fd56a
+  (repo-local, NOT pushed; 6d2093c stays the go-public commit). Loopback verify now PASS.
+- **Seed (mission line):** `send-hello.mjs --url http://127.0.0.1:18080 --key key:hello-world
+  --text "here is a network you can join - my site is node one" --replay` ->
+  announce node-key rcpt:02c04410ce83f328; emit session-log (closed-gate mapped)
+  rcpt:b693a93e5745f96c sha256:e5d90456cecf4c43...; **replay: duplicate ack, receipt
+  byte-identical, the log did not grow**. `/api/export` grep of the mission line: 2 hits
+  (worlds live on the demo origin the tunnel ingress points at).
+- **BLOCKER (open at close of this run, ~11:15 PDT): the public edge does not route yet.**
+  All paths on `https://seams.fyi` (`/`, `/api/hello`, `/api/export`) answer Cloudflare
+  **HTTP 525** with ZERO request lines reaching the connector during 15+ minutes of
+  ~20 s polls (first poll 10:58:52, budget exceeded). Evidence this is the dashboard
+  hostname step, not the connector: (a) connector healthy - 4 registered edge connections,
+  precheck PASS; (b) `dig seams.fyi` -> Cloudflare edge Anycast IPs (zone live + proxied);
+  (c) cloudflared logged "No ingress rules were defined ... will return 503" = the
+  hostname->tunnel binding has not been pushed to this connector. ACTION (Erah, dashboard
+  only): Zero Trust -> Networks -> Tunnels -> the token's tunnel -> add public hostname
+  `seams.fyi`, type HTTP, URL `http://127.0.0.1:18080` (dedicated port per F1; NOT 8080).
+  No connector restart needed when it lands - dashboard config flows to the running unit.
+  Then run: `verify-tunnel-fingerprint.sh` (MUST PASS) + landing 200 + `/api/export` 200 +
+  public `/api/hello` node-one wire read.
+- **qBittorrent shapes: ZERO.** The 525 is the Cloudflare edge's OWN error page (never
+  served from BRIX); the docker-proxy/qBittorrent shape at `100.100.52.102:8080` was never
+  in this path (ingress is 18080-only by ruling and by config), and the negative guard
+  stays in the verify script. Teardown trigger NOT fired - nothing wrong-shaped was ever
+  publicly served.
+- **Teardown (kill-switch):** `ssh BRIX systemctl --user stop cloudflared-seams.service`
+  (add `disable` to also cancel boot-start); token file `shred -u ~/.cloudflared/dashboard-token`.
+  Dashboard side (Erah): Zero Trust -> Networks -> Tunnels -> remove public hostname
+  `seams.fyi`, then delete the tunnel. Loopback posture is intact throughout; teardown
+  returns the node to the pre-cutover state with zero firewall/bind residue.
