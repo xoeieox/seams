@@ -7,7 +7,7 @@
 //
 // The rails the launcher pins (verified 2026-10-26 against eom/node-one, branch eom-node-one):
 export const WIRE_PIN = 'seams-wire/0.3-draft';
-export const FORMAT_PIN = 'seams-attribution-log/0-eom.1';
+export const FORMAT_PIN = 'seams-attribution-log/0-eom.2'; // bumped with the KEYS pass (EOM-KEYS-2026-10-28): the same-commit rule - the pin moves only when the code that emits that format ships
 export const GATE_EXPECT = ['node-key', 'session-log']; // closed set; text/page map AT the gate
 export const MAX_TEXT = 8000;
 

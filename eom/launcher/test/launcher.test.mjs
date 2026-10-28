@@ -893,3 +893,84 @@ test('must-nevers hold in the shipped surface: no payments, no vouches, no verif
     assert.match(app, /creator_verified: false/, 'the false honesty label is displayed as what it is');
   } finally { await killed(s.proc); }
 });
+
+// ---------------- KEYS pass (EOM-KEYS-2026-10-28, owner GO xErah) ----------------
+// The launcher is custody and signer, nothing more: the keypair lives at OPS_DIR/node-key.json
+// (0600), /agent/emit attaches `sig` server-side (keys.mjs, the same code the gateway verifies
+// with) and forwards verbatim, and the honest verdict (creator_verified, fingerprint) arrives in
+// the gateway's own receipt bytes. The window never signs, never holds the seed, never decorates.
+test('KEYS: custody at 0600, server-side signing, gateway verdict verbatim; no-key refuses, foreign key refused, export/import roundtrip', async () => {
+  const POSTJ = (body) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const data = tmp('seams-n1-keys-');
+  const one = serve(NODE_ONE, { PORT: '0', DATA_DIR: data });
+  const oneBase = await one.url;
+  const ops = tmp('seams-ops-keys-');
+  const s = serve(LAUNCHER, { PORT: '0', OPS_DIR: ops, NODE_ONE_URL: oneBase });
+  const base = await s.url;
+  let s2 = null; let base2 = null;
+  try {
+    // no custody, no signature: refused before anything leaves, with an explicit name
+    const pre = await jfetch(base + '/agent/emit', POSTJ({ body: { op: 'emit', kind: 'text', text: 'x' } }));
+    assert.equal(pre.status, 400); assert.equal(pre.body.error, 'no_key', 'nothing was sent and it says so');
+    assert.equal((await jfetch(base + '/agent/keys')).body.present, false);
+
+    const mint = await jfetch(base + '/agent/keys/mint', POSTJ({}));
+    assert.equal(mint.status, 200);
+    assert.match(mint.body.node_key, /^key:ed25519:[A-Za-z0-9+/]{43}=$/, 'a REAL key: 32 raw bytes in base64, not a made-up ref');
+    assert.match(mint.body.fingerprint, /^[A-Za-z0-9+/]{8}$/);
+    assert.equal((await fs.promises.stat(path.join(ops, 'node-key.json'))).mode & 0o777, 0o600, 'custody file is 0600');
+    const re = await jfetch(base + '/agent/keys/mint', POSTJ({}));
+    assert.equal(re.status, 409); assert.equal(re.body.error, 'key_exists', 'no quiet second key over a live one');
+
+    // announce through /agent/emit (node_key omitted -> the held key): gate-checked self-signature
+    const ann = await jfetch(base + '/agent/emit', POSTJ({ body: { op: 'emit', kind: 'node-key', provenance: { attributed_to: { name: 'Launcher Test' } } } }));
+    assert.equal(ann.body.status, 'deposited');
+    assert.equal(ann.body.verified, true, 'registry verified by the gate-checked self-signature, not by the launcher saying so');
+    const x = await jfetch(base + '/api/export');
+    const reg = x.body.nodes.find((n) => n.node_key === mint.body.node_key);
+    assert.ok(reg, 'registered'); assert.equal(reg.verified, true); assert.equal(reg.node_key_fingerprint, mint.body.fingerprint);
+
+    // signed hello: receipt bytes are the gateway's own, verdict included
+    const e1 = await jfetch(base + '/agent/emit', POSTJ({ body: { op: 'emit', kind: 'text', text: 'launcher signed hello', provenance: { origin: 'authored' } } }));
+    assert.equal(e1.body.status, 'deposited');
+    assert.equal(e1.body.creator_verified, true, 'the ✓ is the gateway\'s word, arriving verbatim through the proxy');
+    assert.equal(e1.body.node_key_fingerprint, mint.body.fingerprint);
+    // replay through the signer still byte-identifies: Ed25519 is deterministic
+    const e2 = await jfetch(base + '/agent/emit', POSTJ({ body: { op: 'emit', kind: 'text', text: 'launcher signed hello', provenance: { origin: 'authored' } } }));
+    assert.equal(e2.body.duplicate, true, 'same canonical bytes -> same signature -> the duplicate ack holds');
+
+    // foreign node_key refused HERE, before anything leaves - this window signs only what it holds
+    const fk = await jfetch(base + '/agent/emit', POSTJ({ body: { op: 'emit', kind: 'text', node_key: 'key:ed25519:' + 'A'.repeat(43) + '=', text: 'x' } }));
+    assert.equal(fk.status, 400); assert.equal(fk.body.error, 'foreign_key');
+
+    // status comes from the gateway, fetched not asserted
+    const st = await jfetch(base + '/agent/keys');
+    assert.equal(st.body.present, true); assert.equal(st.body.registered, true);
+    assert.ok(st.body.verified_deposits >= 1, 'verified count from /api/deposits at the gateway');
+
+    // export = the custody file verbatim; import into a fresh launcher through the same parser
+    const exp = await jfetch(base + '/agent/keys/export', POSTJ({}));
+    assert.equal(exp.status, 200);
+    const kf = JSON.parse(exp.raw);
+    assert.equal(kf.v, 1); assert.equal(kf.node_key, mint.body.node_key); assert.equal(typeof kf.priv_b64, 'string');
+    const ops2 = tmp('seams-ops-keys2-');
+    s2 = serve(LAUNCHER, { PORT: '0', OPS_DIR: ops2, NODE_ONE_URL: oneBase });
+    base2 = await s2.url;
+    const junk = await jfetch(base2 + '/agent/keys/import', POSTJ({ key_file: '{"v":1,"node_key":"key:ed25519:' + 'B'.repeat(43) + '=","priv_b64":"' + kf.priv_b64 + '"}' }));
+    assert.equal(junk.status, 400); assert.equal(junk.body.error, 'bad_key_file', 'key/priv must match or nothing lands');
+    assert.equal(fs.existsSync(path.join(ops2, 'node-key.json')), false, 'a refused import leaves NOTHING behind');
+    const imp = await jfetch(base2 + '/agent/keys/import', POSTJ({ key_file: exp.raw }));
+    assert.equal(imp.status, 200); assert.equal(imp.body.node_key, mint.body.node_key);
+    assert.equal((await fs.promises.stat(path.join(ops2, 'node-key.json'))).mode & 0o777, 0o600);
+    const e3 = await jfetch(base2 + '/agent/emit', POSTJ({ body: { op: 'emit', kind: 'text', text: 'an imported key signs too', provenance: { origin: 'authored' } } }));
+    assert.equal(e3.body.creator_verified, true, 'the adopted key verifies at the gateway exactly as the minted one did');
+
+    // the /api/deposits proxy leg is byte-verbatim like every other
+    const dq = '/api/deposits?node_key=' + encodeURIComponent(mint.body.node_key);
+    assert.equal((await jfetch(base + dq)).raw, await (await fetch(oneBase + dq)).text(), 'deposits pass through untouched');
+  } finally {
+    assert.ok(await killed(one.proc), 'node-one killed and ps-verified gone');
+    await killed(s.proc);
+    if (s2) await killed(s2.proc);
+  }
+});

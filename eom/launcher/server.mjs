@@ -10,6 +10,15 @@
 // (ops/agent-queue.md) and the reply-watcher reads (ops/agent-replies.md), plus the two ops files the
 // Config tab edits (node.yaml, declarations.yaml) and parts.json. It does NOT run or talk to any
 // agent - it leaves markdown where the agent's heartbeat looks.
+//
+// KEYS pass (EOM-KEYS-2026-10-28, owner GO xErah): the launcher holds the operator's node keypair
+// (OPS_DIR/node-key.json, 0600, same file shape as scripts/send-hello.mjs) and is the ONLY signer
+// for the window: POST /agent/emit attaches `sig` over the canonical body (keys.mjs, shared code -
+// the launcher does not re-implement crypto, one implementation exists) and forwards the signed
+// bytes to node-one verbatim; the upstream reply returns verbatim, so the receipt (and its honest
+// creator_verified) is the gateway's own words, never the launcher's. The private half leaves this
+// process only through the explicit POST /agent/keys/export (loopback-only server by ruling) so an
+// operator can back their key up or move it - and never to any network but 127.0.0.1.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -72,6 +81,25 @@ const opsFile = (name) => path.join(OPS_DIR, name);
 const readOps = (name) => (fs.existsSync(opsFile(name)) ? fs.readFileSync(opsFile(name), 'utf8') : OPS_DEFAULTS[name]);
 const writeOps = (name, text) => { fs.writeFileSync(opsFile(name), text); };
 
+// keys.mjs lives in the node-one tree; resolve it across the repo/bundle layouts (same candidates
+// the test suite uses). One implementation of the key format, signing and verification - here too.
+const KEYS_CANDIDATES = [
+  path.join(here, 'node-one', 'attributed-text', 'keys.mjs'),      // bundle layout (flat tree)
+  path.join(here, '..', 'node-one', 'attributed-text', 'keys.mjs'), // repo layout
+];
+const K = await import('file://' + (KEYS_CANDIDATES.find((p) => fs.existsSync(p)) || KEYS_CANDIDATES[1]));
+
+// The launcher's key custody file: the SAME {v:1, node_key, priv_b64} shape keys.mjs pins, at a
+// fixed OPS_DIR path, written 0600 by its owner. Storage only - the format is validated by
+// keys.mjs's reader (shape + private/public self-consistency) before anything reads it.
+function writeLauncherKeyFile(pair) {
+  if (!pair || !pair.nodeKey || !pair.privB64) throw new Error('need {nodeKey, privB64}');
+  const file = opsFile('node-key.json');
+  fs.writeFileSync(file, JSON.stringify({ v: 1, node_key: pair.nodeKey, priv_b64: pair.privB64 }) + '\n', { mode: 0o600 });
+  try { fs.chmodSync(file, 0o600); } catch { /* best effort on odd filesystems */ }
+  return file;
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let size = 0; const chunks = [];
@@ -120,6 +148,60 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/hello' && req.method === 'GET') return proxy(res, 'GET', '/api/hello');
     if (p === '/api/export' && req.method === 'GET') return proxy(res, 'GET', '/api/export');
     if (p === '/api/ingest' && req.method === 'POST') return proxy(res, 'POST', '/api/ingest', await readBody(req));
+    if (p === '/api/deposits' && req.method === 'GET') return proxy(res, 'GET', '/api/deposits' + url.search);
+
+    // KEYS custody (EOM-KEYS-2026-10-28): the window's node keypair lives here, at 0600, in OPS_DIR.
+    // The only signer is this server; /agent/emit adds `sig` and forwards verbatim - nothing else on
+    // the request path changes, and the upstream reply is byte-verbatim like every other proxy leg.
+    if (p === '/agent/keys' && req.method === 'GET') {
+      const kf = K.readKeyPairFile(opsFile('node-key.json'));
+      if (!kf) return send(res, 200, { present: false });
+      let registered = null; let verifiedDeposits = null;
+      try { // fetched, never asserted: registration and the verified count come from the gateway itself
+        const r = await fetch(NODE_ONE_URL + '/api/deposits?node_key=' + encodeURIComponent(kf.nodeKey));
+        if (r.ok) { const j = await r.json(); registered = !!j.registered; verifiedDeposits = (j.entries || []).filter((e) => e.creator_verified === true).length; }
+      } catch { /* gateway unreachable: honest null, not a fabricated false */ }
+      return send(res, 200, { present: true, node_key: kf.nodeKey, fingerprint: K.fingerprintOf(kf.nodeKey), registered, verified_deposits: verifiedDeposits, file: opsFile('node-key.json') });
+    }
+    if (p === '/agent/keys/mint' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse((await readBody(req)) || '{}'); } catch { /* {} fine */ }
+      if (K.readKeyPairFile(opsFile('node-key.json')) && !b.replace) return fail(res, 409, 'key_exists', 'A key is already held. Rotate explicitly (replace:true) - minting over a live key without saying so is not offered.');
+      const pair = K.generateKeyPair();
+      writeLauncherKeyFile(pair);
+      return send(res, 200, { ok: true, node_key: pair.nodeKey, fingerprint: pair.pubB64.slice(0, 8) });
+    }
+    if (p === '/agent/keys/export' && req.method === 'POST') {
+      const raw = opsFile('node-key.json');
+      if (!fs.existsSync(raw)) return fail(res, 404, 'no_key', 'The launcher holds no key yet. Mint one first.');
+      const buf = fs.readFileSync(raw); // verbatim file bytes; the operator's own key, loopback-only server
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'content-disposition': 'attachment; filename="seams-node-key.json"', ...HEADERS });
+      return res.end(buf);
+    }
+    if (p === '/agent/keys/import' && req.method === 'POST') {
+      let b; try { b = JSON.parse((await readBody(req)) || '{}'); } catch { return fail(res, 400, 'bad_json', 'Bad request.'); }
+      const text = typeof b.key_file === 'string' ? b.key_file : JSON.stringify(b.key ?? {});
+      if (K.readKeyPairFile(opsFile('node-key.json')) && !b.replace) return fail(res, 409, 'key_exists', 'A key is already held; pass replace:true to swap deliberately.');
+      // validate through the SAME parser the custody read uses: shape, base64, private/public match - or nothing lands
+      const tmp = opsFile('node-key.json.importing');
+      fs.writeFileSync(tmp, text, { mode: 0o600 });
+      const kf = K.readKeyPairFile(tmp);
+      if (!kf) { try { fs.unlinkSync(tmp); } catch { /* ours, seconds old */ } return fail(res, 400, 'bad_key_file', 'Not a seams node key file: shape, key/priv match, or pubkey format failed.'); }
+      fs.renameSync(tmp, opsFile('node-key.json'));
+      try { fs.chmodSync(opsFile('node-key.json'), 0o600); } catch { /* best effort on odd filesystems */ }
+      return send(res, 200, { ok: true, node_key: kf.nodeKey, fingerprint: K.fingerprintOf(kf.nodeKey) });
+    }
+    if (p === '/agent/emit' && req.method === 'POST') {
+      let b; try { b = JSON.parse((await readBody(req)) || '{}'); } catch { return fail(res, 400, 'bad_json', 'Bad request.'); }
+      const kf = K.readKeyPairFile(opsFile('node-key.json'));
+      if (!kf) return fail(res, 400, 'no_key', 'The launcher holds no key yet - mint one in the Keys tab first. Nothing was sent.');
+      const body = b.body && typeof b.body === 'object' ? { ...b.body } : null;
+      if (!body) return fail(res, 400, 'bad_body', 'body must be an emit object.');
+      if (body.node_key === undefined || body.node_key === null || body.node_key === '') body.node_key = kf.nodeKey;
+      if (body.node_key !== kf.nodeKey) return fail(res, 400, 'foreign_key', 'This window signs only with the key it holds; a different node_key is refused before anything leaves.');
+      delete body.sig; // never sign over a signature: the canonical form is the body MINUS sig
+      body.sig = K.signBody(kf.privB64, body);
+      return proxy(res, 'POST', '/api/ingest', JSON.stringify(body));
+    }
 
     // ops file editors (the three files the launcher owns; names whitelisted, traversal dead on arrival)
     if (p === '/ops/file' && req.method === 'GET') {

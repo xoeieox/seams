@@ -45,6 +45,7 @@ const S = Object.assign({
   conform: null,
   text: 'hello, network', origin: 'authored', receipt: null, refusal: null, replayed: false, replayErr: null, replayProofRes: null, logN: null, exportBody: null, exportError: null, exportAt: null,
   quarantineInfo: null,
+  keyStatus: null, keyError: null, keyExport: null,
   queue: [], sent: [], goal: '', route: null, outPath: 'ops/agent-queue.md', replyPath: 'ops/agent-replies.md', replies: [], test: null,
 }, store.get('seams-launcher/v1') || {});
 const save = () => store.set('seams-launcher/v1', {
@@ -90,7 +91,8 @@ const saveLater = save;
 
 async function announce({ from } = {}) {
   if (!S.nodeKey) return;
-  const r = await post('/api/ingest', { op: 'emit', kind: 'node-key', node_key: S.nodeKey.pub, provenance: { attributed_to: { name: S.nodeKey.pub.replace(/^key:/, '') } } });
+  // signed by the launcher server's custody key (POST /agent/emit); the gateway checks it at the gate
+  const r = await post('/agent/emit', { body: { op: 'emit', kind: 'node-key', node_key: S.nodeKey.pub, provenance: { attributed_to: { name: S.nodeKey.pub.replace(/^key:/, '') } } } });
   if (r.ok && r.body?.status === 'deposited') {
     S.registered = true; S.regReceipt = r.body; S.registrationVerified = false;
     // a fresh export read is what turns registration verified (nodes[] is the registry the server itself returns)
@@ -114,7 +116,7 @@ async function emit() {
   if (!hold.allow) { S.refusal = hold.hold; S.receipt = null; return render(); }
   const body = { op: 'emit', kind: 'text', node_key: S.nodeKey.pub, text: S.text, provenance: { origin: S.origin } };
   const nBefore = await logCount();
-  const r = await post('/api/ingest', body);
+  const r = await post('/agent/emit', { body });
   if (r.ok && r.body?.status === 'deposited') {
     S.receipt = r.body; S.refusal = null; S.replayed = false; S.replayProofRes = null;
     // opaque hashes arrive verbatim; n comes from the chain block the server reports
@@ -135,7 +137,7 @@ async function replay() {
   const nBefore = S._nBefore ?? S.logN;
   const first = S.receipt;
   const body = { op: 'emit', kind: 'text', node_key: S.nodeKey.pub, text: S.text, provenance: { origin: S.origin } };
-  const r = await post('/api/ingest', body);
+  const r = await post('/agent/emit', { body });
   const nAfter = await logCount();
   S.replayErr = null;
   if (r.ok && r.body) {
@@ -317,20 +319,30 @@ function renderKeys() {
   const box = h('div', 'pad');
   const nodeBox = h('div', 'card nodekey-box', [el('span', 'keytag', 'NODE KEY')]);
   if (!S.nodeKey) {
-    nodeBox.append(el('span', 'dim', 'No node key yet. Minting makes one here. Only its public half is registered with the node.'),
-      btn('Mint node key', 'primary', mintKey));
+    nodeBox.append(el('span', 'dim', 'No node key yet. Minting makes a real Ed25519 keypair here (OPS_DIR, file mode 0600, zero-dep node:crypto - keys.mjs, the same code the gateway verifies with). The node registers the public half; a signed deposit comes back creator_verified from the gateway receipt itself, never from this window. Export it to back it up; import a file to adopt an existing key.'),
+      btn('Mint node key', 'primary', () => mintKey({})),
+      S.keyError ? h('div', 'hold', [el('span', 'name', S.keyError)]) : null);
   } else {
     nodeBox.append(el('p', 'keypub', S.nodeKey.pub));
-    const kv = h('dl', 'kv', [el('dt', null, 'role'), el('dd', null, 'node'), el('dt', null, 'status'), el('dd', null, S.registered ? 'active' : 'active · not registered yet'), el('dt', null, 'valid_from'), el('dd', null, S.nodeKey.from)]);
+    const st = S.keyStatus && S.keyStatus.node_key === S.nodeKey.pub ? S.keyStatus : null;
+    const kv = h('dl', 'kv', [el('dt', null, 'role'), el('dd', null, 'node'), el('dt', null, 'status'), el('dd', null, S.registered ? 'active' : 'active · not registered yet'), el('dt', null, 'fingerprint'), el('dd', null, st ? st.fingerprint : '— (fetched from the gateway) · display only, verification uses the full key'), el('dt', null, 'verified deposits'), el('dd', null, st && st.verified_deposits != null ? st.verified_deposits + ' (from /api/deposits at the gateway)' : '— (gateway not reached)'), el('dt', null, 'valid_from'), el('dd', null, S.nodeKey.from)]);
     nodeBox.append(kv);
     const acts = h('div', 'rowlist');
     if (!S.registered) acts.append(btn('Register public half', 'primary', () => announce({})));
-    acts.append(btn('Rotate', null, mintKey));
+    acts.append(btn('Rotate', null, () => mintKey({ replace: true })));
+    acts.append(btn('Export key file', null, exportKey));
+    acts.append(btn('Refresh status', 'sm', syncKeyStatus));
     if (S.registered) {
       acts.append(h('div', 'proofrow', [el('span', 'dim', 'Registered · server accepted node-key'), tag(S.registrationVerified, S.registrationVerified ? 'seen in export nodes[] from a fresh export fetch' : 'server accepted the announce; not yet cross-checked against export nodes[]')]));
       if (S.regReceipt?.payload_hash) acts.append(el('div', 'receipt-hash mono dim3', 'registry payload hash: ' + S.regReceipt.payload_hash));
     }
     nodeBox.append(acts);
+    if (S.keyExport) {
+      const pre = el('textarea', 'emitter'); pre.rows = 3; pre.value = S.keyExport;
+      nodeBox.append(el('div', 'dim3', 'Your key file, as held at OPS_DIR/node-key.json (0600). Your own private half, on a loopback-only screen - copy it somewhere safe; anyone holding it holds your node key.'), pre);
+    }
+    const ta = el('textarea', 'emitter'); ta.rows = 2; ta.placeholder = 'paste a seams node key file JSON to import it (same parser as the custody read: shape, base64, key/priv match)';
+    nodeBox.append(el('div', 'rowlist', [ta, btn('Import key file', 'sm', () => importKey(ta.value))]));
     if (S.oldKeys.length) nodeBox.append(el('div', 'dim3 mono', 'retired: ' + S.oldKeys.map((k) => k.pub).join(' · ')));
   }
   box.append(nodeBox);
@@ -339,13 +351,41 @@ function renderKeys() {
   box.append(human);
   return box;
 }
-async function mintKey() {
-  const a = crypto.getRandomValues(new Uint8Array(8));
-  const ref = 'node-' + [...a].map((b) => b.toString(16).padStart(2, '0')).join('');
+async function mintKey({ replace } = {}) {
+  const r = await post('/agent/keys/mint', replace ? { replace: true } : {});
+  if (!r.ok) { S.keyError = (r.body && r.body.error) || ('mint refused (' + r.status + ')'); S.keyExport = null; return render(); }
   if (S.nodeKey) S.oldKeys = [{ pub: S.nodeKey.pub }, ...S.oldKeys];
-  S.nodeKey = { pub: 'key:' + ref, from: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
-  S.registered = false; S.registrationVerified = false; S.regReceipt = null;
+  S.nodeKey = { pub: r.body.node_key, from: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  S.registered = false; S.registrationVerified = false; S.regReceipt = null; S.keyError = null; S.keyExport = null;
+  save(); render(); syncKeyStatus();
+}
+async function syncKeyStatus() {
+  const r = await api('/agent/keys');
+  if (!r.ok || !r.body) return;
+  if (r.body.present) {
+    S.keyStatus = r.body;
+    S.nodeKey = (S.nodeKey && S.nodeKey.pub === r.body.node_key) ? S.nodeKey : { pub: r.body.node_key, from: (S.nodeKey && S.nodeKey.from) || new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+    S.registered = r.body.registered === true;
+  } else {
+    S.keyStatus = null;
+    if (S.nodeKey && !/^key:ed25519:/.test(S.nodeKey.pub)) { S.nodeKey = null; S.registered = false; S.regReceipt = null; } // stale pre-KEYS ref-key from localStorage
+  }
   save(); render();
+}
+async function exportKey() {
+  const r = await post('/agent/keys/export', {});
+  S.keyError = r.ok ? null : ((r.body && r.body.error) || 'export refused (' + r.status + ')');
+  S.keyExport = r.ok ? r.text : null;
+  render();
+}
+async function importKey(text) {
+  const r = await post('/agent/keys/import', { key_file: String(text || '') });
+  if (!r.ok) { S.keyError = (r.body && r.body.error) || ('import refused (' + r.status + ')'); return render(); }
+  S.keyError = null; S.keyExport = null;
+  if (S.nodeKey && S.nodeKey.pub !== r.body.node_key) S.oldKeys = [{ pub: S.nodeKey.pub }, ...S.oldKeys];
+  S.nodeKey = { pub: r.body.node_key, from: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  S.registered = false; S.registrationVerified = false; S.regReceipt = null;
+  save(); render(); syncKeyStatus();
 }
 
 // ---------- CONFIG ----------
@@ -520,6 +560,9 @@ function renderHello() {
         'n ' + (rc.v ?? '—'),
       ]),
       el('div', 'opaque-note', 'Hashes are opaque, shown exactly as received.'),
+      rc.creator_verified === true
+        ? h('div', 'receipt', [h('div', 'h', [badge('✓ checked', 'ok'), el('span', 'dim', ' the gateway receipt itself carries the creator check as true · fingerprint '), el('span', 'mono dim3', rc.node_key_fingerprint || '—'), tag(true, 'read from the gateway receipt itself, not launcher state')])])
+        : h('div', 'receipt', [h('div', 'h', [badge('claim', 'warn'), el('span', 'dim', ' name-only claim at the gateway (creator_verified ' + (rc.creator_verified === false ? 'false' : 'absent') + ') - sign it in Keys and re-emit for the ✓')])]),
     ]);
     b3.append(mapped);
   }
@@ -720,6 +763,7 @@ function render() {
 // first open = the living README (the setup walkthrough), on the same tabs.
 render();
 loadCfg();
+syncKeyStatus(); // key custody truth lives in OPS_DIR on the server; the window mirrors it, never the reverse
 
 // PWA app shell: register the service worker. sw.js caches static assets only (network-first)
 // and steps aside from every dynamic route (/api, /ops, /agent, /health) - freshness by hash means
