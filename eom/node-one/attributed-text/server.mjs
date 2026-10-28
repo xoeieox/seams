@@ -15,7 +15,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { Store, StoreError, nameKey, WIRE_VERSION, GATE_KINDS, KIND_MAP, MAX_TEXT, MAX_NAME } from './lib.mjs';
+import { Store, StoreError, nameKey, WIRE_VERSION, GATE_KINDS, KIND_MAP, MAX_TEXT, MAX_NAME, nodeKeyOk } from './lib.mjs';
+import { fingerprintOf } from './keys.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const HOST = process.env.BIND_HOST || '127.0.0.1';   // T1: loopback until the exposure ruling
@@ -64,7 +65,7 @@ const socketIp = (req) => req.socket.remoteAddress || 'unknown-socket';
 // The go-public pass (2026-10-28) split the front door: '/' is the protocol LANDING page (the honest
 // human window - what Seams is/is-not, how to join, the live hello-worlds); the attributed-text
 // editor rides at '/text'. Static bytes are deterministic; no inline script (CSP script-src 'self').
-const STATIC = { '/': ['landing.html', 'text/html; charset=utf-8'], '/text': ['index.html', 'text/html; charset=utf-8'], '/index.html': ['index.html', 'text/html; charset=utf-8'], '/landing.js': ['landing.js', 'text/javascript; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/app.css': ['app.css', 'text/css; charset=utf-8'] };
+const STATIC = { '/': ['landing.html', 'text/html; charset=utf-8'], '/text': ['index.html', 'text/html; charset=utf-8'], '/demo': ['index.html', 'text/html; charset=utf-8'], '/attributed-text': ['index.html', 'text/html; charset=utf-8'], '/index.html': ['index.html', 'text/html; charset=utf-8'], '/landing.js': ['landing.js', 'text/javascript; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/app.css': ['app.css', 'text/css; charset=utf-8'] };
 const HEADERS = {
   'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store',
@@ -92,7 +93,7 @@ const STATUS = {
   conflict: 409, too_big: 413, bad_json: 400,
   // ingest-gate codes (net-new in this build leg):
   unknown_op: 400, bad_node_key: 400, unknown_kind: 400, bad_request: 400, bad_content: 400,
-  bad_origin: 400, already_deposited: 409, parents_on_original: 400,
+  bad_origin: 400, already_deposited: 409, parents_on_original: 400, bad_signature: 400,
   consent_gate_unbuilt: 501, log_integrity: 503,
 };
 
@@ -140,8 +141,9 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/api/hello') {
       return send(res, 200, {
         ok: true, node: 'node-one', ...wireEcho,
-        format: 'seams-attribution-log/0-eom.1',
+        format: 'seams-attribution-log/0-eom.2',
         gate: { kinds: GATE_KINDS, maps: KIND_MAP, on_unknown: 'refuse (unknown_kind), never accept-and-map-silently' },
+        signing: 'ed25519: body.sig (base64) over the canonical body minus sig (REQ-SIGN, eom/endpoint-surface/requirements.yaml); verified-at-gate only; a bad sig refuses (bad_signature), never deposits',
         limits: { max_text: MAX_TEXT, max_name: MAX_NAME, max_body_bytes: 64 * 1024 },
         idempotence: 'keyed on payload hash of the canonical emit body; replays ack the original receipt',
         integrity: store.integrity.ok ? 'ok' : 'QUARANTINED (export refuses until operator review)',
@@ -162,6 +164,20 @@ const server = http.createServer(async (req, res) => {
       // export() itself refuses when the load-time chain check flagged tampering (T5a:
       // a tampered log is quarantined, never re-hashed into cleanliness and never served).
       return send(res, 200, JSON.stringify(store.export(), null, 2), 'application/json; charset=utf-8', { 'content-disposition': 'attachment; filename="attribution-log.json"' });
+    }
+    if (req.method === 'GET' && p === '/api/deposits') {
+      // EOM-KEYS-2026-10-28: the public "what did THIS key deposit" view - a filtered read of
+      // export, public exactly like export is (ruled), carrying the same verified/fingerprint
+      // truth. A badly formed node_key refuses; an unknown-but-well-formed key answers count 0,
+      // it is never a 404 (absence of deposits is an honest answer, not a missing page).
+      const nk = url.searchParams.get('node_key');
+      if (typeof nk !== 'string' || !nk.trim()) throw new StoreError('bad_node_key', 'node_key query parameter required (key:<ref> or key:ed25519:<base64>).');
+      const key = nk.trim();
+      if (!nodeKeyOk(key)) throw new StoreError('bad_node_key', 'node_key must look like key:<ref> or key:ed25519:<base64 public key>.');
+      const x = store.export();   // refuses 503 log_integrity exactly like export does
+      const reg = x.nodes.find((n) => n.node_key === key) ?? null;
+      const entries = x.entries.filter((e) => e.creator_ref === key || e.creator_ref === `name:${key}`);
+      return send(res, 200, { format: x.format, wire: x.wire, node_key: key, registered: !!reg, registry: reg, count: entries.length, entries });
     }
     if (req.method === 'POST' && p === '/api/edit') {
       const ip = 'edit-ip:' + socketIp(req);

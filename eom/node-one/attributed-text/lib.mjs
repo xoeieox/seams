@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { NODE_KEY_ED25519_RE, verifyBodySig, fingerprintOf } from './keys.mjs';
 
 export const MAX_TEXT = 8000;
 export const MAX_NAME = 40;
@@ -132,6 +133,10 @@ const chainHash = (salt, prev, payloadObj) => sha(salt + '|' + prev + '|' + cano
 
 const ORIGIN_SET = new Set(['authored', 'assisted', 'played']);
 const NODE_KEY_RE = /^key:[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$/i;
+// KEYS demo (EOM-KEYS-2026-10-28): a ref key (name-only claim) OR a real Ed25519 key the
+// gateway can verify. Base64 of 32 bytes is always 43 chars + one '=' pad.
+const nodeKeyOk = (k) => NODE_KEY_RE.test(k) || NODE_KEY_ED25519_RE.test(k);
+export { nodeKeyOk };
 const PAGE_KINDS = new Set(['seed', 'edit', 'revert']);
 
 export class Store {
@@ -289,7 +294,7 @@ export class Store {
     const seen = this.receipts.get(payloadHash);
     if (seen) return { ...seen, duplicate: true };
     const nodeKey = typeof body.node_key === 'string' ? body.node_key.trim() : '';
-    if (!NODE_KEY_RE.test(nodeKey)) throw new StoreError('bad_node_key', 'node_key must look like key:<ref>, 3-64 chars, letters digits . _ -.');
+    if (!nodeKeyOk(nodeKey)) throw new StoreError('bad_node_key', 'node_key must look like key:<ref> (3-64 chars, letters digits . _ -) or key:ed25519:<base64 public key>.');
     const kind = mapKind(body.kind ?? null, body);
     if (!kind) throw new StoreError('unknown_kind', `kind gate closed: accept {${GATE_KINDS.join(', ')}} (text/page map to session-log).`);
     const derivation = body.derivation ?? 'original';
@@ -297,15 +302,33 @@ export class Store {
     if (Array.isArray(body.parents) && body.parents.length) throw new StoreError('parents_on_original', 'an original has no parents; fork/remix is refused here (consent_gate_unbuilt).');
     const origin = body.provenance?.origin ?? 'authored';
     if (!ORIGIN_SET.has(origin)) throw new StoreError('bad_origin', 'provenance.origin must be one of authored|assisted|played.');
+    // KEYS demo (REQ-SIGN, pinned in eom/endpoint-surface/requirements.yaml): a body carrying
+    // `sig` is verified at the GATE, before anything is stored. The signature must verify under
+    // the key EMBEDDED IN node_key itself, over the canonical body minus sig. A present-but-bad
+    // sig is a gate refusal (bad_signature) - nothing deposits, nothing quarantines: quarantine
+    // is for a corrupted log, not for someone else's bad signature. Absence of sig stays legal:
+    // that deposit is a name-only claim and export says so (creator_verified false).
+    const hasSig = body.sig !== undefined && body.sig !== null;
+    let keyVerified = false;
+    if (hasSig) {
+      if (!NODE_KEY_ED25519_RE.test(nodeKey)) throw new StoreError('bad_signature', 'a signed emit needs a key:ed25519:<base64> node_key - there is no key to check that signature against. Nothing was deposited.');
+      if (!verifyBodySig(nodeKey, body)) throw new StoreError('bad_signature', 'signature does not verify against node_key over the canonical body (REQ-SIGN-1). Nothing was deposited.');
+      keyVerified = true;
+    }
     let text;
     if (kind === 'node-key') {   // a node-key announce carries no content; text is not required here
       const who = normName(body.provenance?.attributed_to?.name ?? '') || normName(body.node_key) || nodeKey;
       if (!this.nodes.has(nodeKey)) this.nodes.set(nodeKey, { first_seen: new Date().toISOString(), seen: 0 });
       const rec = this.nodes.get(nodeKey); rec.seen++; rec.who = who;
-      const receipt = { status: 'deposited', kind, receipt: 'rcpt:' + sha(payloadHash).slice(7, 23), id: body.id ?? null, payload_hash: payloadHash, node_key: nodeKey, ts: new Date().toISOString(), duplicate: false };
+      // Registration verification (REQ-SIGN-3): a self-signed node-key announce (sig over the
+      // canonical body, checked against the key embedded in node_key) marks the registry entry
+      // verified; verified is monotone - a later unsigned announce never un-verifies a key that
+      // already proved control of its private half.
+      rec.verified = !!rec.verified || keyVerified;
+      const receipt = { status: 'deposited', kind, receipt: 'rcpt:' + sha(payloadHash).slice(7, 23), id: body.id ?? null, payload_hash: payloadHash, node_key: nodeKey, verified: !!rec.verified, ...(fingerprintOf(nodeKey) ? { node_key_fingerprint: fingerprintOf(nodeKey) } : {}), ts: new Date().toISOString(), duplicate: false };
       this.receipts.set(payloadHash, receipt);
       this._persistReceipt(receipt);
-      if (this.file) fs.appendFileSync(path.join(this._dir(), 'nodes.jsonl'), JSON.stringify({ node_key: nodeKey, who, first_seen: rec.first_seen, seen: rec.seen, ts: receipt.ts }) + '\n');
+      if (this.file) fs.appendFileSync(path.join(this._dir(), 'nodes.jsonl'), JSON.stringify({ node_key: nodeKey, who, first_seen: rec.first_seen, seen: rec.seen, verified: !!rec.verified, ts: receipt.ts }) + '\n');
       return receipt;
     }
 
@@ -325,11 +348,17 @@ export class Store {
     const e = {
       ts: new Date().toISOString(), name: nodeKey, kind: 'ingest', ingested_from: nodeKey,
       base_v: this.head?.v ?? 0, segs, hunks: [], payload_hash: payloadHash,
+      // REQ-SIGN-4 (verified-only-on-truth): creator_verified is true iff the gateway verified
+      // this body's signature at ingest AND the key was registered in the registry (announce
+      // first, then emit - the rule pinned in requirements.yaml). Everything else, signed-but-
+      // unregistered included, stays a claim: key_verified false.
+      key_verified: keyVerified && this.nodes.has(nodeKey),
+      ...(hasSig ? { sig: String(body.sig) } : {}),
       provenance: { origin: 'ingested', declared_origin: origin, via: 'ingest' },
     };
     this._stamp(e, text, nodeKey, { origin: 'ingested', declared_origin: origin });
     this._append(e);
-    const receipt = { status: 'deposited', kind, receipt: 'rcpt:' + sha(payloadHash).slice(7, 23), id: body.id ?? null, payload_hash: payloadHash, content_hash: e.content_hash, deposit_hash: e.deposit_hash, v: e.v, ts: e.ts, duplicate: false };
+    const receipt = { status: 'deposited', kind, receipt: 'rcpt:' + sha(payloadHash).slice(7, 23), id: body.id ?? null, payload_hash: payloadHash, content_hash: e.content_hash, deposit_hash: e.deposit_hash, v: e.v, creator_verified: e.key_verified, ...(fingerprintOf(nodeKey) ? { node_key_fingerprint: fingerprintOf(nodeKey) } : {}), ts: e.ts, duplicate: false };
     this.receipts.set(payloadHash, receipt);
     this._persistReceipt(receipt);
     this.contentIndex.set(preHash, nodeKey);
@@ -353,7 +382,7 @@ export class Store {
     if (!fs.existsSync(f)) return;
     for (const line of fs.readFileSync(f, 'utf8').split('\n')) {
       if (!line.trim()) continue;
-      try { const r = JSON.parse(line); this.nodes.set(r.node_key, { first_seen: r.first_seen, seen: r.seen, who: r.who }); } catch { /* skip bad registry lines */ }
+      try { const r = JSON.parse(line); this.nodes.set(r.node_key, { first_seen: r.first_seen, seen: r.seen, who: r.who, verified: !!r.verified }); } catch { /* skip bad registry lines */ }
     }
   }
 
@@ -418,10 +447,16 @@ export class Store {
       const text = textOf(e.segs);
       const isKey = String(e.name).startsWith('key:');
       const ingested = e.kind === 'ingest';
+      const fp = fingerprintOf(e.name);
       const out = {
         op: 'emit', kind: 'session-log', v: e.v, ts: e.ts, content_hash: e.content_hash,
         deposit_hash: e.deposit_hash, parents: [], derivation: 'original',
-        creator_ref: isKey ? e.name : `name:${e.name}`, creator_verified: false,
+        creator_ref: isKey ? e.name : `name:${e.name}`,
+        // KEYS demo (0-eom.2): true ONLY for an ingest entry the gateway signature-checked at
+        // ingest (REQ-SIGN-4). A typed name - and any ingest without a verified signature - is
+        // a claim and says so: creator_verified false, no badge.
+        creator_verified: e.key_verified === true,
+        node_key_fingerprint: fp,
         provenance: { origin: ingested ? 'ingested' : 'authored', entry_kind: e.kind, base_version: e.base_v,
           ...(e.provenance?.declared_origin && { declared_origin: e.provenance.declared_origin }),
           ...(e.merged && { merged: true }), ...(e.restored_v && { restored_version: e.restored_v }),
@@ -434,11 +469,11 @@ export class Store {
       prev = e.chain?.hash ?? null; return out;
     });
     return {
-      format: 'seams-attribution-log/0-eom.1',
+      format: 'seams-attribution-log/0-eom.2',
       wire: WIRE_VERSION,
-      note: 'Shaped after the fields of seams-wire/0.3-draft emit (kind, parents, derivation, creator_ref, provenance, use_terms), with the build-leg wire-semantics fixes: kind vocabulary enforced (entries are session-log; text/page payloads were mapped at the closed gate, no new wire kind), a version chain is NOT a derivation (parents stay [] and the log chain is carried separately in `chain`), content_hash/deposit_hash are computed once at append time and verified at load - a tampered log makes export refuse, it never silently re-hashes. Hashes remain opaque placeholders until the deposits-spec ruling lands; signing and keys are not in this demo (creator_verified is always false).',
+      note: 'Shaped after the fields of seams-wire/0.3-draft emit (kind, parents, derivation, creator_ref, provenance, use_terms), with the build-leg wire-semantics fixes: kind vocabulary enforced (entries are session-log; text/page payloads were mapped at the closed gate, no new wire kind), a version chain is NOT a derivation (parents stay [] and the log chain is carried separately in `chain`), content_hash/deposit_hash are computed once at append time and verified at load - a tampered log makes export refuse, it never silently re-hashes. Hashes remain opaque placeholders until the deposits-spec ruling lands. KEYS pass (0-eom.2, EOM-KEYS-2026-10-28): signing is live - creator_verified true means the gateway verified an Ed25519 signature over the canonical body (REQ-SIGN rules, pinned in eom/endpoint-surface/requirements.yaml) against the key embedded in node_key, at ingest time, for a registered key; a typed or unsigned node_key is a claim and stays creator_verified false. node_key_fingerprint is the first 8 chars of the base64 public half. A bad signature is refused at the gate (bad_signature), never deposited, never quarantined. This adds fields; it removes none - the 0-eom.1 readers keep working.',
       integrity: { ok: true, tampered: [], corrupt_lines: this.integrity.corrupt.length, anchor_ok: this.integrity.anchorOk, legacy_bootstrap: this.integrity.legacy },
-      nodes: [...this.nodes.entries()].map(([node_key, r]) => ({ node_key, who: r.who ?? null, first_seen: r.first_seen, seen: r.seen })),
+      nodes: [...this.nodes.entries()].map(([node_key, r]) => ({ node_key, who: r.who ?? null, first_seen: r.first_seen, seen: r.seen, verified: !!r.verified, node_key_fingerprint: fingerprintOf(node_key) })),
       use_terms: { allowed_uses: ['view', 'fork', 'remix'], compensation: 'none', note: 'Anyone may change this; your name stays on your words.' },
       entries,
     };

@@ -278,7 +278,7 @@ test('server: / is the honest landing page; the editor lives at /text; landing.j
     for (const re of [/payments?\s*(accepted|enabled|processed|due)/i, /we\s+(charge|bill)|pricing\s+plan|paid\s+(plan|tier)|invoice\s+you|get\s+paid/i, /verified:\s*true|verified\s+by\s+(cloudflare|seams)/i]) {
       assert.doesNotMatch(h, re, 'landing page must never make an affirmative commercial/verification claim: ' + re);
     }
-    assert.match(h, /Not verified by anyone|No one has verified/i, 'and it states non-verification in words');
+    assert.match(h, /Not verified by any third party|Not verified by anyone|No one has verified/i, 'and it states non-verification in words (KEYS pass 2026-10-28: signature checks exist, by THIS gateway only; no third party ever verifies anything)');
     assert.match(h, /No payments|no pricing/i, 'and it states no-payments in words');
     assert.match(h, /No vouches/i, 'and it states no-vouches in words');
     const ed = await fetch(base + '/text');
@@ -312,4 +312,121 @@ test('server: export REFUSES (503) on a tampered log and never re-hashes it clea
     const h = await (await fetch(ready + '/api/hello')).json();
     assert.match(h.integrity, /QUARANTINED/, 'hello reports the quarantine so peers see it before emitting');
   } finally { try { child.kill('SIGKILL'); } catch { /* gone */ } }
+});
+
+// ==================== KEYS pass (EOM-KEYS-2026-10-28, owner GO xErah) ====================
+// The verified-attribution surface: Ed25519 keys embedded in node_key, signatures checked AT THE
+// GATE over the canonical body minus sig (REQ-SIGN, pinned in eom/endpoint-surface/requirements
+// .yaml). Rules under test: verified only on a valid signature for a REGISTERED key; a typed/
+// unsigned deposit stays a claim; a bad signature refuses at the gate and neither deposits nor
+// quarantines; fingerprints are display-only, verification always uses the full embedded key.
+import * as K from '../keys.mjs';
+const signK = (pair, body) => { const b = { ...body }; b.sig = K.signBody(pair.privB64, b); return b; };
+const bootServer = async (env = {}) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'eom-keys-'));
+  const child = spawn(process.execPath, [path.join(root, 'server.mjs')], {
+    cwd: root, env: { ...process.env, PORT: '0', BIND_HOST: '127.0.0.1', DATA_DIR: dir, ...env }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const base = await new Promise((resolve, reject) => {
+    let out = ''; const to = setTimeout(() => reject(new Error('no bind: ' + out)), 8000);
+    child.stdout.on('data', (c) => { out += c; const m = out.match(/listening on http:\/\/127\.0\.0\.1:(\d+)/); if (m) { clearTimeout(to); resolve(`http://127.0.0.1:${m[1]}`); } });
+    child.stderr.on('data', (c) => { out += c; });
+    child.on('exit', (code) => reject(new Error(`exited ${code}: ${out}`)));
+  });
+  return { child, base, dir };
+};
+
+test('KEYS gate: signed node-key announce verifies the registry entry; verified is monotone; a bad-sig announce refuses and registers nothing', () => {
+  const s = mk();
+  const pair = K.generateKeyPair();
+  const ann = s.ingest(signK(pair, { op: 'emit', kind: 'node-key', node_key: pair.nodeKey, provenance: { attributed_to: { name: 'lab' } } }));
+  assert.equal(ann.status, 'deposited'); assert.equal(ann.verified, true, 'registry verified from the checked self-signature');
+  assert.equal(ann.node_key_fingerprint, pair.pubB64.slice(0, 8));
+  // monotone: an unsigned re-announce never un-verifies
+  const ann2 = s.ingest({ op: 'emit', kind: 'node-key', node_key: pair.nodeKey, provenance: { attributed_to: { name: 'lab' } } });
+  assert.equal(ann2.verified, true, 'verified never decays back to a claim');
+  // the honest negative: an announce with a broken signature refuses at the gate, registering nothing
+  const stranger = K.generateKeyPair();
+  const bad = { op: 'emit', kind: 'node-key', node_key: stranger.nodeKey, provenance: { attributed_to: { name: 'x' } }, sig: K.signBody(stranger.privB64, { op: 'emit', kind: 'node-key', node_key: stranger.nodeKey, text: 'WRONG BODY' }) };
+  assert.equal(codes(() => s.ingest(bad)), 'bad_signature');
+  assert.equal(s.nodes.has(stranger.nodeKey), false, 'a refused announce registers NOTHING');
+  const x = s.export();
+  assert.equal(x.format, 'seams-attribution-log/0-eom.2');
+  assert.equal(x.nodes.find((n) => n.node_key === pair.nodeKey).verified, true);
+  assert.equal(x.nodes.find((n) => n.node_key === pair.nodeKey).node_key_fingerprint, pair.pubB64.slice(0, 8));
+});
+
+test('KEYS gate: creator_verified ONLY for verified sig on a registered key; signed-but-unregistered stays a claim; tampered/ref-key/garbage sigs refuse and deposit nothing', () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'eom-keys-gate-'));
+  const s = new Store(path.join(d, 'log.jsonl')); s.seed('The quick brown fox', 'Ann'); const n0 = s.entries.length;
+  const pair = K.generateKeyPair();
+  s.ingest(signK(pair, { op: 'emit', kind: 'node-key', node_key: pair.nodeKey, provenance: { attributed_to: { name: 'lab' } } }));
+  const em = s.ingest(signK(pair, { op: 'emit', kind: 'session-log', node_key: pair.nodeKey, text: 'signed words stand', provenance: { origin: 'authored' } }));
+  assert.equal(em.status, 'deposited'); assert.equal(em.creator_verified, true); assert.equal(em.node_key_fingerprint, pair.pubB64.slice(0, 8));
+  // valid signature, key never announced -> a claim, not verified (REQ-SIGN-4)
+  const lone = K.generateKeyPair();
+  const lm = s.ingest(signK(lone, { op: 'emit', kind: 'session-log', node_key: lone.nodeKey, text: 'signed but unregistered', provenance: { origin: 'authored' } }));
+  assert.equal(lm.status, 'deposited'); assert.equal(lm.creator_verified, false, 'registration is required for the badge');
+  const nNow = s.entries.length;
+  const good = signK(pair, { op: 'emit', kind: 'session-log', node_key: pair.nodeKey, text: 'tamper me not', provenance: { origin: 'authored' } });
+  assert.equal(codes(() => s.ingest({ ...good, text: good.text + ' TAMPERED' })), 'bad_signature');
+  assert.equal(codes(() => s.ingest({ ...good, node_key: 'key:ref-only' })), 'bad_signature');
+  assert.equal(codes(() => s.ingest({ ...good, sig: 'not-base64!!' })), 'bad_signature');
+  assert.equal(codes(() => s.ingest({ ...good, sig: K.signBody(lone.privB64, good) })), 'bad_signature', 'a sig from a DIFFERENT key never verifies under this one');
+  assert.equal(s.entries.length, nNow, 'refusals deposited nothing');
+  assert.equal(fs.existsSync(path.join(s._dir(), 'quarantine.jsonl')), false, 'a bad signature is a gate refusal, never a quarantine entry');
+  const entry = s.export().entries.find((e) => e.text === 'signed words stand');
+  assert.equal(entry.creator_verified, true);
+  assert.equal(entry.node_key_fingerprint, pair.pubB64.slice(0, 8));
+  assert.equal(s.export().entries.find((e) => e.text === 'tamper me not'), undefined);
+});
+
+test('KEYS gate: replay of a signed emit acks the original receipt; sig is inside the payload hash (bytes are bytes)', () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'eom-keys-replay-'));
+  const s = new Store(path.join(d, 'log.jsonl')); s.seed('base', 'Ann');
+  const pair = K.generateKeyPair();
+  s.ingest(signK(pair, { op: 'emit', kind: 'node-key', node_key: pair.nodeKey, provenance: {} }));
+  const body = signK(pair, { op: 'emit', kind: 'session-log', node_key: pair.nodeKey, text: 'replay me exactly', provenance: { origin: 'authored' } });
+  const r1 = s.ingest(body); const r2 = s.ingest(structuredClone(body));
+  assert.equal(r2.duplicate, true); assert.equal(r2.creator_verified, true, 'the duplicate ack keeps the verified truth of the original receipt');
+  const { duplicate: _a, ...o1 } = r1; const { duplicate: _b, ...o2 } = r2;
+  assert.deepEqual(o2, o1);
+});
+
+test('KEYS gate: registry verified state persists across restart (nodes.jsonl carries verified)', () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'eom-keys-persist-')); const f = path.join(d, 'log.jsonl');
+  const pair = K.generateKeyPair();
+  const s = new Store(f); s.seed('base', 'Ann');
+  s.ingest(signK(pair, { op: 'emit', kind: 'node-key', node_key: pair.nodeKey, provenance: {} }));
+  const s2 = new Store(f);
+  assert.equal(s2.nodes.get(pair.nodeKey).verified, true, 'verified survives the restart - the file, not the memory, is the truth');
+  assert.equal(s2.export().nodes.find((n) => n.node_key === pair.nodeKey).verified, true);
+});
+
+test('KEYS server: bad signature = 400 bad_signature with wire echo, nothing deposited, nothing quarantined; deposits view filters honestly', async () => {
+  const srv = await bootServer();
+  try {
+    const pair = K.generateKeyPair();
+    const postJson = async (body) => { const r = await fetch(srv.base + '/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); return { status: r.status, body: await r.json() }; };
+    const n0 = (await (await fetch(srv.base + '/api/export')).json()).entries.length;
+    const good = signK(pair, { op: 'emit', kind: 'session-log', node_key: pair.nodeKey, text: 'server-level tamper case', provenance: { origin: 'authored' } });
+    const bad = await postJson({ ...good, text: good.text + ' TAMPERED' });
+    assert.equal(bad.status, 400); assert.equal(bad.body.error, 'bad_signature'); assert.equal(bad.body.wire, WIRE_VERSION, 'refusals echo wire (REQ-EMIT-9 holds for the new code too)');
+    assert.equal((await (await fetch(srv.base + '/api/export')).json()).entries.length, n0, 'the log grew nothing');
+    assert.equal(fs.existsSync(path.join(srv.dir, 'quarantine.jsonl')), false, 'nothing quarantined');
+    // the full honest roundtrip over HTTP
+    const ann = await postJson(signK(pair, { op: 'emit', kind: 'node-key', node_key: pair.nodeKey, provenance: { attributed_to: { name: 'lab' } } }));
+    assert.equal(ann.body.verified, true);
+    const em = await postJson(signK(pair, { op: 'emit', kind: 'text', node_key: pair.nodeKey, text: 'server-level signed hello', provenance: { origin: 'authored' } }));
+    assert.equal(em.body.status, 'deposited'); assert.equal(em.body.creator_verified, true);
+    const dep = await (await fetch(srv.base + '/api/deposits?node_key=' + encodeURIComponent(pair.nodeKey))).json();
+    assert.equal(dep.count, 1); assert.equal(dep.registered, true);
+    assert.equal(dep.entries[0].creator_verified, true); assert.equal(dep.entries[0].node_key_fingerprint, pair.pubB64.slice(0, 8));
+    const empty = await fetch(srv.base + '/api/deposits?node_key=' + encodeURIComponent('key:ed25519:' + Buffer.alloc(32).toString('base64')));
+    assert.equal(empty.status, 200, 'a well-formed unknown key is an honest count 0, not a 404');
+    assert.equal((await empty.json()).count, 0);
+    for (const q of ['/api/deposits', '/api/deposits?node_key=' + encodeURIComponent('key:!!')]) {
+      const r = await fetch(srv.base + q); assert.equal(r.status, 400, q); assert.equal((await r.json()).error, 'bad_node_key');
+    }
+  } finally { try { srv.child.kill('SIGKILL'); } catch { /* gone */ } }
 });
