@@ -34,7 +34,7 @@ d9ae385676b9061ba377e0517aeb9c880364a4e071f8cea930457d6c47cc612f  eom/launcher/p
 b907a05b9b5d86a0eb73a0c38556860e798f9eea3163ece931becb952852147a  eom/launcher/public/sw.js
 7f6aa3bdf71b97f236f8f3cf77826fa1253653b1225a37015bf2d34172d74fa2  eom/launcher/scripts/make-icons.mjs
 024ddd32d3125c0c70adaa26a8debe096133f06b0a1cae882351ff7768660a5d  eom/launcher/scripts/make-mac-bundle.sh
-a893ddd620738e89904f347ea7963e0de765bdf859f90899b23d586f6c3bacc1  eom/launcher/server.mjs
+03b8a1e14fd1f288a87faa4e9fce9bdad98f06949c9df0286b092e0163a6c47f  eom/launcher/server.mjs
 63bcff48aee1fd0b858b13520d53577162bcde403dff15940bcfa0d09e3ea9d3  eom/launcher/tauri/src-tauri/.gitignore
 964786ac2bd8c22f3449300aed99667a26a71109caf0f4d5b02a8fb0183e0f61  eom/launcher/tauri/src-tauri/Cargo.toml
 487059eaf8a947b80f20a9aacac038a5047b2ad69d2401b827376c67d6fe847f  eom/launcher/tauri/src-tauri/build.rs
@@ -43,15 +43,15 @@ a238e7f8a8e5786208174cdede85767e85cb00744a9f45d7440d1302b09e4812  eom/launcher/t
 6b7f1b8049d520bad88fae12dcc72f0a0c43e2e523a970c2d612359f766298ac  eom/launcher/tauri/src-tauri/src/lib.rs
 b120c0ba280ed13bd5e3774f8e8eeb790a967acfec0e3bf9ed9a2b7911b8dbd5  eom/launcher/tauri/src-tauri/src/main.rs
 e42b654073b1693a92a00feaff8554e301deb4fc0153e534843ef3664569d145  eom/launcher/tauri/src-tauri/tauri.conf.json
-30a1ccb120072512586846faab55696b0f35a9594f9bc126bab3db8ebb855674  eom/launcher/test/launcher.test.mjs
+18698dfe773374e4339f7926d121d0bad5a42929bfa8311aa1824050740a10b4  eom/launcher/test/launcher.test.mjs
 8ad7c156211aead77386755a3eb0d9d13f266ada65389632b24828200fd616c9  eom/node-one/attributed-text/.gitignore
 9b5b61e03b2352a3b260bd8d02a035176cb7756c22d6773a814e8f0c15e739ad  eom/node-one/attributed-text/README.md
 09243ccd6c024eb2fe712e025370df7aae3f27cef018e9e5efbf0e81028ba289  eom/node-one/attributed-text/keys.mjs
 095edbae228c0c099e6414f1426056957fa4d30324fc36cd0eeaea277111ba34  eom/node-one/attributed-text/lib.mjs
 7edc3c4319959d7b5436c3398322d012e1fc804f2c7c111783839471efe36d7e  eom/node-one/attributed-text/package.json
-a3829e85df3edfb818bb3ae7314a2e23a257589a2079385c295bcad850afa988  eom/node-one/attributed-text/public/app.css
-dfaf574961009e16cc5dcb650ffa22e5cb83d71d85c6833c200adb5973f13b1c  eom/node-one/attributed-text/public/app.js
-90b97799a1acb3857d55478ad355f8dafbd8d17338bc103f1d8f261969c42585  eom/node-one/attributed-text/public/home.html
+e8c8461605f0f5fe60a65b9bf5331089d986f5f22ce86e45774602cc51715c67  eom/node-one/attributed-text/public/app.css
+5649d8cff43c07a7fa9c57736477efb6347e4a94b696e6a7aa4a3237f9f35efa  eom/node-one/attributed-text/public/app.js
+624fc1290978817423cf7aaf1781b6a3203abca8b2bb49537724318c6f608355  eom/node-one/attributed-text/public/home.html
 78e89c950c27a0e719f09a784e7bead7e25b01646c653c9deefb6f4ef34050bb  eom/node-one/attributed-text/public/home.js
 bfac29762f48c322767821caf0da4606d8951523769ec0925fd2f4402d10e289  eom/node-one/attributed-text/public/index.html
 66a93a01b06a3477d25133da2a74eedf8cadc168a3413e93312dff3bf45a10c2  eom/node-one/attributed-text/public/landing.html
@@ -64,6 +64,7 @@ ef0626a9db999998a1fa05dee7f60dba4ed4ec78b4f97c1116827d66f812707d  eom/node-one/a
 11fddb48605bda0e0609a440c8e2c4456bc385418934615f4b071af4d69f6c70  eom/node-one/attributed-text/test/hue.test.mjs
 fdd62c33c54968ffda2f44f838088ea5a61cfe9e265072bc42636fec1921b6df  eom/node-one/attributed-text/test/lib.test.mjs
 996109547142d0ea6ea3f6733dbf347b5bf8e242b3ce20ec57ee224d5a9190db  eom/node-one/attributed-text/test/site-gates.test.mjs
+aec1a1b630950451e61fc9943c8775ffb3897852099c4a2003f0365d37fbd9b8  eom/node-one/attributed-text/test/timeline.test.mjs
 65dad25d79bebd4f651e101fdebbaa62d1aeb8cca782bfaf4290f72975923e8c  kit/README.md
 7020311aa30f4393e650705ceb388b01e8fc4daebf7b3bbddc1f5ad5b5daf995  kit/battle.py
 e59eef717f3de568b738653ab555f2be52772b040b4eb135d4e3089a09fc0f63  kit/bootstrap.sh

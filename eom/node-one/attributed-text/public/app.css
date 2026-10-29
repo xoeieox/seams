@@ -92,7 +92,7 @@ textarea:focus, input:focus { outline: 2px solid var(--t-muted); outline-offset:
    variant (l 34 light / l 74 dark) carries hue into the author NAME. Verified = a neutral ink
    ring, never green, no seal, no identity implication; claim = dashed. The .hl tint is a
    selection state in the author view, not identity labelling. */
-:root { --t-pl: 86%; --t-plt: 34%; }
+:root { --t-pl: 86%; --t-plt: 34%; --s: 60%; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme]) { --t-pl: 30%; --t-plt: 74%; } }
 :root[data-theme='dark'] { --t-pl: 30%; --t-plt: 74%; }
 
@@ -219,3 +219,13 @@ textarea:focus, input:focus { outline: 2px solid var(--t-muted); outline-offset:
 .doc li { margin: 0.35rem 0; }
 .doc .live { border: 1px solid var(--t-line); padding: 0.8rem 1rem; border-radius: var(--t-r-m); background: var(--t-panel); font-family: var(--t-keys); font-size: 0.85rem; white-space: pre-wrap; }
 .doc footer { margin-top: 3rem; color: var(--t-muted); font: 0.85rem/1.5 var(--t-ui); border-top: 1px solid var(--t-line); padding-top: 1rem; }
+
+/* timeline river (R4): positions only; colours come from the existing .aN author classes */
+.river { position: relative; height: calc(var(--lanes) * 3.4rem + 1rem); margin: 1rem 0 0.25rem 0; border-left: 1px solid var(--t-line); border-right: 1px solid var(--t-line); }
+.river .lane { position: absolute; left: 0; right: 0; top: calc(var(--li) * 3.4rem + 0.5rem); height: 3.4rem; border-bottom: 1px dashed var(--t-line); }
+.river .lanelabel { position: absolute; left: 0.4rem; top: 0.1rem; color: var(--t-muted); text-decoration: none; font-size: 0.8rem; z-index: 0; }
+.river .rnode { background: hsl(var(--h) var(--s) var(--t-pl)); position: absolute; left: var(--x); top: calc(var(--li) * 3.4rem + 0.5rem + 1.7rem); width: var(--sz); height: var(--sz); margin: calc(var(--sz) / -2) 0 0 calc(var(--sz) / -2); border-radius: 50%; border: 2px dashed var(--t-muted); z-index: 1; }
+.river .rnode.ok { border: 2px solid var(--t-ink); }
+.river .rnode.rev { border-radius: 3px; }
+.river .rnode:hover, .river .rnode:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.rends { display: flex; justify-content: space-between; }

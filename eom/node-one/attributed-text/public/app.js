@@ -285,7 +285,7 @@
     const color = btn('Colour by author', () => { colorOn = !colorOn; store.set('color', colorOn ? '1' : '0'); render(); });
     color.setAttribute('aria-pressed', String(colorOn));
     bar.append(btn('Edit', () => { location.hash = '#/edit'; }, 'primary'), color,
-      linkBtn('Deposits', '#/deposits'), linkBtn(`Names (${state.authors.length})`, '#/names'), linkBtn('History', '#/history'));
+      linkBtn('Deposits', '#/deposits'), linkBtn(`Names (${state.authors.length})`, '#/names'), linkBtn('History', '#/history'), linkBtn('Timeline', '#/timeline'));
     app.classList.add('wide');
     const left = el('div');
     // arrival banner: /demo?landed=<hash> (the launcher's "see it land" ends here; the launcher
@@ -418,6 +418,49 @@
       li.append(a); ul.append(li);
     }
     mount(nav('#/', '← Back to the current text'), el('h2', '', 'Every version'), el('p', 'meta ui', 'Nothing is ever deleted. Tap a version to read it.'), ul);
+  }
+
+
+  // ---------- timeline river (R4, 2026-10-29) ----------
+  // The demo's centerpiece: the linear change history laid out on REAL time. One lane per author
+  // (first-appearance order), x = when the version landed, node size = words changed, a node is a
+  // link to that version. Verified key = solid ring + check, typed name = dashed ring (the same
+  // claims-vs-proof legend as the page). Data is /api/versions only (stats + name + ts); this view
+  // computes no trust, and a linear chain is shown as linear - branches need parents + the consent gate.
+  async function viewTimeline() {
+    const [vs, map] = await Promise.all([api('/api/versions'), verifMap()]);
+    const lanes = [];
+    for (const v of vs) if (!lanes.includes(v.name)) lanes.push(v.name);
+    const t = vs.map((v) => Date.parse(v.ts)).filter((n) => Number.isFinite(n));
+    const t0 = Math.min(...t), t1 = Math.max(...t), span = t1 - t0;
+    const pos = (v, i) => (span > 0 ? (Date.parse(v.ts) - t0) / span : vs.length > 1 ? i / (vs.length - 1) : 0.5);
+    const words = (v) => (v.stats ? (v.stats.added_words || 0) + (v.stats.removed_words || 0) : 0);
+    const maxW = Math.max(1, ...vs.map(words));
+    const river = el('div', 'river');
+    river.style.setProperty('--lanes', String(Math.max(1, lanes.length)));
+    lanes.forEach((name, li) => {
+      const lane = el('div', 'lane'); lane.style.setProperty('--li', String(li));
+      const lab = el('a', 'lanelabel ui'); lab.href = '#/a/' + encodeURIComponent(name);
+      lab.append(el('span', `dot a${hueSlot(name)}`), ' ' + (isEdKey(name) ? 'key · ' + name.slice(12, 20) : name));
+      lane.append(lab); river.append(lane);
+    });
+    vs.forEach((v, i) => {
+      const li = lanes.indexOf(v.name), verified = !!(map && map.get(v.name) && map.get(v.name).verified);
+      const size = 14 + Math.round(18 * Math.sqrt(words(v) / maxW));
+      const a = el('a', `rnode a${hueSlot(v.name)}${isEdKey(v.name) && verified ? ' ok' : ' claim'}${v.kind === 'revert' ? ' rev' : ''}`);
+      a.href = '#/v/' + v.v;
+      a.style.setProperty('--x', (3 + pos(v, i) * 94).toFixed(2) + '%');
+      a.style.setProperty('--li', String(li)); a.style.setProperty('--sz', size + 'px');
+      const what = v.kind === 'seed' ? 'first text' : v.kind === 'revert' ? `restored v${v.restored_v}` : `+${v.stats.added_words} −${v.stats.removed_words} words`;
+      a.title = `v${v.v} · ${v.name} · ${what} · ${ago(v.ts)}${verified ? ' · key checked at ingest' : isEdKey(v.name) ? ' · signature not checked: a claim' : ' · typed name: a claim'}`;
+      a.setAttribute('aria-label', a.title);
+      river.append(a);
+    });
+    const ends = el('div', 'rends meta ui'); ends.append(el('span', '', vs.length ? `first · ${ago(vs[0].ts)}` : ''), el('span', '', vs.length ? `latest · ${ago(vs[vs.length - 1].ts)}` : ''));
+    mount(nav('#/', '← Back'), el('h2', '', 'How this text changed'),
+      el('p', 'meta ui', 'Left to right is real time. One row per author; bigger dot, bigger edit. Solid ring: a key whose signature the gateway checked. Dashed ring: a name as typed, a claim. Tap a dot to read that version.'),
+      river, ends,
+      el('p', 'meta ui', 'This is one straight line of edits. Branches (forks and remixes) arrive with the consent layer.'));
   }
 
   async function viewVersion(n) {
@@ -562,6 +605,7 @@
       else if (h === '/edit') await viewEdit();
       else if (h === '/names') await viewNames();
       else if (h === '/history') await viewHistory();
+      else if (h === '/timeline') await viewTimeline();
       else if (h === '/about') viewAbout();
       else if (h === '/deposits') await viewDeposits();
       else if (h === '/admin') viewAdmin();

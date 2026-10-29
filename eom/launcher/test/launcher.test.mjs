@@ -974,3 +974,63 @@ test('KEYS: custody at 0600, server-side signing, gateway verdict verbatim; no-k
     if (s2) await killed(s2.proc);
   }
 });
+
+// ---------------- R1 (2026-10-29): optional public gateway target, emit-only, config-injected ----------------
+test('R1: no gateway configured -> /gateway/* is 404; bad SEAMS_GATEWAY_URL values refuse to boot', async () => {
+  const s = serve(LAUNCHER, { PORT: '0', OPS_DIR: tmp('seams-ops-'), NODE_ONE_URL: 'http://127.0.0.1:1' });
+  try {
+    const base = await s.url;
+    const r = await jfetch(base + '/gateway/hello');
+    assert.equal(r.status, 404); assert.equal(r.body.error, 'no_gateway');
+    assert.equal((await jfetch(base + '/health')).body.gateway, null);
+  } finally { await killed(s.proc); }
+  for (const bad of ['http://example.com', 'https://user:pw@example.com', 'https://example.com/api', 'ftp://example.com', 'nonsense']) {
+    const b = serve(LAUNCHER, { PORT: '0', OPS_DIR: tmp('seams-ops-'), NODE_ONE_URL: 'http://127.0.0.1:1', SEAMS_GATEWAY_URL: bad });
+    const code = await new Promise((r) => proc_exit(b.proc, r));
+    assert.equal(code, 1, bad + ' refused'); assert.match(b.out(), /SEAMS_GATEWAY_URL/);
+  }
+});
+
+test('R1: gateway emit signs launcher-side, checks the gateway hello first, and the verdict is the gateway\'s own', async () => {
+  const POSTJ = (body) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const gw = serve(NODE_ONE, { PORT: '0', DATA_DIR: tmp('seams-gw-') });
+  const gwBase = await gw.url;
+  const local = serve(NODE_ONE, { PORT: '0', DATA_DIR: tmp('seams-local-') });
+  const localBase = await local.url;
+  const s = serve(LAUNCHER, { PORT: '0', OPS_DIR: tmp('seams-ops-gw-'), NODE_ONE_URL: localBase, SEAMS_GATEWAY_URL: gwBase });
+  const base = await s.url;
+  try {
+    assert.equal((await jfetch(base + '/health')).body.gateway, gwBase);
+    const hello = await jfetch(base + '/gateway/hello');
+    assert.equal(hello.status, 200); assert.equal(hello.body.wire, WIRE_PIN);
+    const pre = await jfetch(base + '/gateway/emit', POSTJ({ body: { op: 'emit', kind: 'session-log', payload: { text: 'x' } } }));
+    assert.equal(pre.body.error, 'no_key');
+    const mint = await jfetch(base + '/agent/keys/mint', POSTJ({}));
+    const nk = mint.body.node_key;
+    const wrongOp = await jfetch(base + '/gateway/emit', POSTJ({ body: { op: 'export' } }));
+    assert.equal(wrongOp.body.error, 'unknown_op');
+    const foreign = await jfetch(base + '/gateway/emit', POSTJ({ body: { op: 'emit', node_key: 'key:someone-else', kind: 'node-key', payload: {} } }));
+    assert.equal(foreign.body.error, 'foreign_key');
+    // announce on the GATEWAY, then a signed session-log: verified there, and nothing landed on the local node
+    const ann = await jfetch(base + '/gateway/emit', POSTJ({ body: { op: 'emit', node_key: nk, kind: 'node-key', provenance: { attributed_to: { name: 'Gateway Test' } } } }));
+    assert.equal(ann.status, 200, ann.raw);
+    const e = await jfetch(base + '/gateway/emit', POSTJ({ body: { op: 'emit', node_key: nk, kind: 'text', text: 'hello, gateway', provenance: { origin: 'authored' } } }));
+    assert.equal(e.status, 200, e.raw);
+    const dep = await jfetch(base + '/gateway/deposits?node_key=' + encodeURIComponent(nk));
+    assert.ok(dep.body.entries.some((x) => x.creator_verified === true), 'gateway checked the signature at ingest');
+    const loc = await jfetch(localBase + '/api/deposits?node_key=' + encodeURIComponent(nk));
+    assert.equal(loc.body.count, 0, 'the local node saw nothing: gateway routes do not fall through');
+  } finally { await killed(s.proc); await killed(gw.proc); await killed(local.proc); }
+});
+
+test('R1: version skew or a dead gateway holds the emit launcher-side, nothing sent', async () => {
+  const POSTJ = (body) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const s = serve(LAUNCHER, { PORT: '0', OPS_DIR: tmp('seams-ops-gw-'), NODE_ONE_URL: 'http://127.0.0.1:1', SEAMS_GATEWAY_URL: 'http://127.0.0.1:1' });
+  const base = await s.url;
+  try {
+    await jfetch(base + '/agent/keys/mint', POSTJ({}));
+    const r = await jfetch(base + '/gateway/emit', POSTJ({ body: { op: 'emit', kind: 'session-log', payload: { text: 'x' } } }));
+    assert.equal(r.status, 409); assert.equal(r.body.error, 'held by launcher');
+    assert.equal((await jfetch(base + '/gateway/hello')).status, 502);
+  } finally { await killed(s.proc); }
+});

@@ -25,7 +25,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import {
-  WIRE_PIN, NODE_YAML_DEFAULT, renderDeclarations, appendPacket, parseReplies, parseQueueTasks,
+  WIRE_PIN, helloGate, canEmit, NODE_YAML_DEFAULT, renderDeclarations, appendPacket, parseReplies, parseQueueTasks,
   composeBrief, lintPointers,
 } from './launcher-core.mjs';
 
@@ -45,6 +45,25 @@ function loopbackOnly(u) {
 if (!loopbackOnly(NODE_ONE_URL)) {
   console.error(`launcher refuses to start: NODE_ONE_URL=${JSON.stringify(NODE_ONE_URL)} is not loopback.`);
   console.error('The launcher runs local/loopback only; exposure is blocked-on-ruling. Point NODE_ONE_URL at a 127.0.0.1 server.');
+  process.exit(1);
+}
+
+// --- optional public gateway target (ruling R1, 2026-10-29: emit-only, config-injected, no UI) ----
+// Set SEAMS_GATEWAY_URL to a bare origin (https, or loopback http for tests). There is no UI for it and
+// no runtime setter: an operator injects it at boot or there is no remote surface at all. The surface it
+// opens is exactly four routes (/gateway/hello|export|deposits GET, /gateway/emit POST); the local node
+// stays loopback-only, the wire pin is checked against the gateway's own hello before every send, and
+// only this server signs. Key material never leaves; /agent/keys* never touch the gateway.
+const GATEWAY_URL = (process.env.SEAMS_GATEWAY_URL || '').replace(/\/+$/, '') || null;
+function gatewayOk(u) {
+  try {
+    const p = new URL(u);
+    if (p.username || p.password || p.search || p.hash || (p.pathname !== '/' && p.pathname !== '')) return false;
+    return p.protocol === 'https:' || loopbackOnly(u);
+  } catch { return false; }
+}
+if (GATEWAY_URL && !gatewayOk(GATEWAY_URL)) {
+  console.error(`launcher refuses to start: SEAMS_GATEWAY_URL=${JSON.stringify(GATEWAY_URL)} must be a bare https origin (no credentials, path, query).`);
   process.exit(1);
 }
 fs.mkdirSync(OPS_DIR, { recursive: true });
@@ -112,16 +131,16 @@ const cleanStr = (s, max = 200) => String(s ?? '').normalize('NFC').replace(/[\u
 
 // The proxy: byte-verbatim pass-through. No re-serialization anywhere on the response path -
 // an opaque hash that survives here unchanged is the whole honesty story of the Baseline tab.
-async function proxy(res, method, apiPath, body) {
+async function proxy(res, method, apiPath, body, base = NODE_ONE_URL) {
   let r;
   try {
-    r = await fetch(NODE_ONE_URL + apiPath, {
+    r = await fetch(base + apiPath, {
       method,
       headers: method === 'POST' ? { 'content-type': 'application/json' } : {},
       body: method === 'POST' ? body : undefined,
     });
   } catch (e) {
-    return fail(res, 502, 'node_unreachable', `Cannot reach node-one at ${NODE_ONE_URL} (${e.cause?.code || e.message}). Start it: node eom/node-one/attributed-text/server.mjs`);
+    return fail(res, 502, 'node_unreachable', `Cannot reach ${base === NODE_ONE_URL ? 'node-one' : 'the gateway'} at ${base} (${e.cause?.code || e.message}).${base === NODE_ONE_URL ? ' Start it: node eom/node-one/attributed-text/server.mjs' : ''}`);
   }
   const text = await r.text();
   res.writeHead(r.status, { 'content-type': r.headers.get('content-type') || 'application/json; charset=utf-8', ...HEADERS });
@@ -138,7 +157,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/health') {
       return send(res, 200, {
         ok: true, node: 'seams-launcher', wire_pin: WIRE_PIN, posture: 'local-only',
-        node_one: NODE_ONE_URL, ops_dir: OPS_DIR,
+        node_one: NODE_ONE_URL, gateway: GATEWAY_URL, ops_dir: OPS_DIR,
         agent_routes: ['outbox', 'copy'],
         agent_endpoint_route: 'out-of-scope this month: the credentials question is unresolved (see README)',
       });
@@ -149,6 +168,33 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/export' && req.method === 'GET') return proxy(res, 'GET', '/api/export');
     if (p === '/api/ingest' && req.method === 'POST') return proxy(res, 'POST', '/api/ingest', await readBody(req));
     if (p === '/api/deposits' && req.method === 'GET') return proxy(res, 'GET', '/api/deposits' + url.search);
+
+    // Public gateway (R1): present only when SEAMS_GATEWAY_URL was injected at boot; otherwise 404.
+    if (p.startsWith('/gateway/')) {
+      if (!GATEWAY_URL) return fail(res, 404, 'no_gateway', 'No gateway target is configured (SEAMS_GATEWAY_URL). Nothing was sent.');
+      if (p === '/gateway/hello' && req.method === 'GET') return proxy(res, 'GET', '/api/hello', undefined, GATEWAY_URL);
+      if (p === '/gateway/export' && req.method === 'GET') return proxy(res, 'GET', '/api/export', undefined, GATEWAY_URL);
+      if (p === '/gateway/deposits' && req.method === 'GET') return proxy(res, 'GET', '/api/deposits' + url.search, undefined, GATEWAY_URL);
+      if (p === '/gateway/emit' && req.method === 'POST') {
+        let b; try { b = JSON.parse((await readBody(req)) || '{}'); } catch { return fail(res, 400, 'bad_json', 'Bad request.'); }
+        const kf = K.readKeyPairFile(opsFile('node-key.json'));
+        if (!kf) return fail(res, 400, 'no_key', 'The launcher holds no key yet - mint one in the Keys tab first. Nothing was sent.');
+        const body = b.body && typeof b.body === 'object' ? { ...b.body } : null;
+        if (!body) return fail(res, 400, 'bad_body', 'body must be an emit object.');
+        if (body.op !== 'emit') return fail(res, 400, 'unknown_op', 'The gateway route sends op "emit" only.');
+        if (body.node_key === undefined || body.node_key === null || body.node_key === '') body.node_key = kf.nodeKey;
+        if (body.node_key !== kf.nodeKey) return fail(res, 400, 'foreign_key', 'This window signs only with the key it holds; a different node_key is refused before anything leaves.');
+        // rails before emit, against the GATEWAY's own hello, fetched now: pinned wire, closed gate, not quarantined
+        let hello = null;
+        try { const h = await fetch(GATEWAY_URL + '/api/hello'); hello = await h.json(); } catch { /* unreachable: held below */ }
+        const hold = canEmit({ rail: helloGate(hello), quarantined: hello && /QUARANTINED/i.test(String(hello.integrity || '')) });
+        if (!hold.allow) return send(res, 409, { error: hold.hold.name, message: hold.hold.msg, foot: hold.hold.foot });
+        delete body.sig;
+        body.sig = K.signBody(kf.privB64, body);
+        return proxy(res, 'POST', '/api/ingest', JSON.stringify(body), GATEWAY_URL);
+      }
+      return fail(res, 404, 'not_found', 'Not found.');
+    }
 
     // KEYS custody (EOM-KEYS-2026-10-28): the window's node keypair lives here, at 0600, in OPS_DIR.
     // The only signer is this server; /agent/emit adds `sig` and forwards verbatim - nothing else on
