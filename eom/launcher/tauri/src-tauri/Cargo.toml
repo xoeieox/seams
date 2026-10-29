@@ -1,0 +1,33 @@
+# Seams Launcher - the Tauri 2 native shell around the zero-dep loopback launcher.
+#
+# The runtime UI stays zero-dependency (plain HTML/CSS/JS in eom/launcher/public, served
+# by server.mjs). Everything Cargo-side here is the native window only: sidecar spawn
+# (node launch.mjs), window, reap. This is build tooling, not app dependencies - the one
+# and only dependency the launcher project carries lives in devDependencies one level up.
+[package]
+name = "seams-launcher"
+version = "0.1.0"
+description = "Seams Launcher native window - loopback only, one sidecar, honest failure panels."
+authors = ["Seams"]
+edition = "2021"
+rust-version = "1.77.2"
+
+# lib name `app_lib` per the Tauri 2 convention (create-tauri-app layout).
+[lib]
+name = "app_lib"
+# staticlib/cdylib keep the mobile-prep shape; rlib backs the desktop bin.
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Deliberately just tauri itself: the sidecar spawn/reap uses std::process + `kill`,
+# and tauri re-exports Url and the http Response types. No libc, no url crate.
+tauri = { version = "2", features = [] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

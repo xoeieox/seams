@@ -1,0 +1,12 @@
+{
+  "name": "attributed-text",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "One page of text anyone can change; every word keeps the name of who wrote it.",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": { "node": ">=18" }
+}

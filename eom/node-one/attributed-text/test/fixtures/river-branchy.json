@@ -1,0 +1,14 @@
+{
+  "note": "A payload that CLAIMS lineage: one version row with parents, one deposit with derivation fork, plus malformed rows. The river must refuse the branchy ones, skip the malformed, and draw the rest. Fixture data.",
+  "versions": [
+    { "v": 1, "ts": "2026-10-28T10:00:00.000Z", "name": "Erah", "kind": "seed", "stats": { "added_words": 10, "removed_words": 0 } },
+    { "v": 2, "ts": "2026-10-28T10:10:00.000Z", "name": "Sam", "kind": "edit", "parents": ["sha256:x"], "stats": { "added_words": 3, "removed_words": 0 } },
+    { "name": "no-version-number", "ts": "2026-10-28T10:11:00.000Z" },
+    null
+  ],
+  "entries": [
+    { "v": 3, "ts": "2026-10-28T10:20:00.000Z", "creator_ref": "name:Fork", "provenance": { "entry_kind": "ingest" }, "derivation": "fork", "parents": [] },
+    { "v": 4, "ts": "2026-10-28T10:30:00.000Z", "creator_ref": "name:Fine", "provenance": { "entry_kind": "ingest" }, "derivation": "original", "parents": [] },
+    { "v": 5, "ts": "2026-10-28T10:40:00.000Z", "provenance": { "entry_kind": "ingest" } }
+  ]
+}

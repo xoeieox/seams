@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"><style>body{margin:0;background:#f0eee9;font-family:system-ui,sans-serif}a{color:#2f6fd6}a:hover{color:#1d4fa3}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 system-ui,sans-serif;color:#1a1a1a}.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 system-ui,sans-serif;color:rgba(0,0,0,.55);max-width:380px}.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}.dv-next{margin:22px 0 0;font:12px/1.5 system-ui,sans-serif;color:rgba(0,0,0,.5)}</style></helmet>
+<section class="dv-turn" id="t3">
+<div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname">Direction locked to <a class="dv-oid" href="#2a">2a</a> (tall). First open as a living README, plus connecting your agent.</span></div>
+<div style="max-width:760px;margin:0 0 24px;font:13px/1.5 'Kalam',cursive;color:#333">The launcher never talks with your agent. It writes tasks somewhere your agent already looks. Notes and open questions are in <span style="font-family:'JetBrains Mono',monospace;font-size:12px">docs/agent-handoff-open-questions.md</span>.</div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="3a"><div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a><span>First open: the living README. The tabs are the steps, each with one line on what it's for. It folds into the normal tabs once you're set up.</span></div>
+<div class="dv-card" style="width:380px;font-family:'Kalam',cursive;color:#222">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1.5px solid #222;background:#f4f3ef"><div style="flex:1;font-weight:700;font-size:14px">seams launcher</div><div style="font:11px 'JetBrains Mono',monospace;color:#777">setup 1 / 7</div><div style="font-size:14px">— ×</div></div>
+<div style="padding:5px 10px;border-bottom:1px solid #ccc;font:10px 'JetBrains Mono',monospace;color:#555;display:flex;justify-content:space-between"><span>wire 0.3-draft ✓ pinned</span><span>gate 2 kinds</span><span style="color:#2e8b57">integrity ok</span></div>
+<div style="padding:12px 12px 8px;display:flex;flex-direction:column;gap:4px"><b style="font-size:17px">Join the network as a node.</b><span style="font-size:12px;color:#555">You set it up here. Agents do the work later. Every step can be done by hand or handed to your agent.</span></div>
+<div style="display:flex;flex-direction:column;font-size:12px;padding:0 12px 10px;gap:0">
+<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #ddd"><span style="width:18px;height:18px;border:1.5px solid #222;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none">✓</span><div style="flex:1"><b>Rails</b> — see what the server accepts before you send</div></div>
+<div style="display:flex;gap:8px;padding:7px 0;border:1.5px solid #222;background:#fbfbf8;margin:2px -6px;padding-left:6px;padding-right:6px"><span style="width:18px;height:18px;border:1.5px solid #2f6fd6;background:#2f6fd6;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none">2</span><div style="flex:1;display:flex;flex-direction:column;gap:5px"><span><b>Keys</b> — mint the node key that identifies this node</span><span style="border:1.5px solid #222;background:#222;color:#fff;padding:2px 10px;align-self:flex-start">Start ›</span></div></div>
+<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #ddd;color:#666"><span style="width:18px;height:18px;border:1.5px solid #aaa;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none">3</span><div style="flex:1"><b>Agent</b> — tell the launcher where your agent picks up work</div></div>
+<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #ddd;color:#666"><span style="width:18px;height:18px;border:1.5px solid #aaa;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none">4</span><div style="flex:1"><b>Config</b> — paths and accepted deviations</div></div>
+<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #ddd;color:#666"><span style="width:18px;height:18px;border:1.5px solid #aaa;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none">5</span><div style="flex:1"><b>Parts</b> — what you have, what to grow</div></div>
+<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #ddd;color:#666"><span style="width:18px;height:18px;border:1.5px solid #aaa;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none">6</span><div style="flex:1"><b>Conform</b> — check, see gaps</div></div>
+<div style="display:flex;gap:8px;padding:7px 0;color:#666"><span style="width:18px;height:18px;border:1.5px solid #aaa;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none">7</span><div style="flex:1"><b>Hello world</b> — first deposit + baseline</div></div>
+</div>
+<div style="padding:8px 12px;border-top:1px solid #ccc;font-size:11px;color:#777;display:flex;justify-content:space-between"><span>Skip to tabs</span><span>Reopen anytime: ? in title bar</span></div>
+</div></div>
+
+<div class="dv-opt" id="3b"><div class="dv-olabel"><a class="dv-oid" href="#3b">3b</a><span>Step 3, Agent: "Where does your agent pick up work?" Three routes. The launcher asks and never probes your machine.</span></div>
+<div class="dv-card" style="width:380px;font-family:'Kalam',cursive;color:#222">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1.5px solid #222;background:#f4f3ef"><div style="flex:1;font-weight:700;font-size:14px">seams launcher</div><div style="font:11px 'JetBrains Mono',monospace;color:#777">setup 3 / 7</div></div>
+<div style="padding:5px 10px;border-bottom:1px solid #ccc;font:10px 'JetBrains Mono',monospace;color:#555;display:flex;justify-content:space-between"><span>wire 0.3-draft ✓ pinned</span><span>node key ✓</span><span style="color:#2e8b57">integrity ok</span></div>
+<div style="padding:12px;display:flex;flex-direction:column;gap:9px;font-size:12px">
+<div style="display:flex;flex-direction:column;gap:2px"><b style="font-size:16px">Where does your agent pick up work?</b><span style="color:#555">The launcher doesn't run or talk to your agent. It just leaves tasks where your agent looks.</span></div>
+<div style="border:1.5px solid #222;padding:8px;display:flex;flex-direction:column;gap:5px;background:#fbfbf8">
+<div style="display:flex;gap:6px;align-items:center"><span>◉</span><b style="flex:1">Outbox file</b><span style="font-size:11px;color:#2e8b57">works with any agent</span></div>
+<div style="padding-left:18px;color:#555">The launcher writes a markdown file. Point your agent's heartbeat at it.</div>
+<div style="padding-left:18px;display:flex;flex-direction:column;gap:3px"><span style="font-size:11px;color:#777">path</span><div style="border:1.5px solid #222;padding:3px 6px;font:11px 'JetBrains Mono',monospace;background:#fff">ops/agent-queue.md</div><span style="font-size:11px;color:#777">replies (optional)</span><div style="border:1.5px solid #222;padding:3px 6px;font:11px 'JetBrains Mono',monospace;background:#fff;color:#999">ops/agent-replies.md</div></div></div>
+<div style="border:1.5px solid #aaa;padding:8px;display:flex;flex-direction:column;gap:3px"><div style="display:flex;gap:6px"><span>○</span><b style="flex:1">Endpoint</b><span style="font-size:11px;color:#c98a00">open question</span></div><div style="padding-left:18px;color:#777">POST the packet to a URL you give it (OpenAI-compatible, Anthropic, local).</div></div>
+<div style="border:1.5px solid #aaa;padding:8px;display:flex;flex-direction:column;gap:3px"><div style="display:flex;gap:6px"><span>○</span><b style="flex:1">Copy only</b></div><div style="padding-left:18px;color:#777">You paste it into your agent yourself.</div></div>
+<div style="color:#777;font-size:11px">Tip: show snippet for your agent's heartbeat › <span style="font-family:'JetBrains Mono',monospace">"check ops/agent-queue.md…"</span></div>
+<div style="display:flex;gap:6px"><span style="border:1.5px solid #222;background:#222;color:#fff;padding:3px 12px">Save + write test task</span><span style="border:1.5px solid #222;padding:3px 10px">Later</span></div>
+</div></div></div>
+
+<div class="dv-opt" id="3c"><div class="dv-olabel"><a class="dv-oid" href="#3c">3c</a><span>Connection check: the launcher writes a test task and waits for a reply. It stays honest. "File written" is <b>verified</b>, "agent picked it up" is only <b>asserted</b>.</span></div>
+<div class="dv-card" style="width:380px;font-family:'Kalam',cursive;color:#222">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1.5px solid #222;background:#f4f3ef"><div style="flex:1;font-weight:700;font-size:14px">seams launcher</div><div style="font:11px 'JetBrains Mono',monospace;color:#777">setup 3 / 7</div></div>
+<div style="padding:5px 10px;border-bottom:1px solid #ccc;font:10px 'JetBrains Mono',monospace;color:#555;display:flex;justify-content:space-between"><span>wire 0.3-draft ✓ pinned</span><span>node key ✓</span><span style="color:#2e8b57">integrity ok</span></div>
+<div style="padding:12px;display:flex;flex-direction:column;gap:10px;font-size:12px">
+<b style="font-size:16px">Checking your agent connection</b>
+<div style="display:flex;gap:8px;align-items:center"><span style="width:18px;height:18px;border:1.5px solid #222;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none">✓</span><span style="flex:1">test task written to <span style="font-family:'JetBrains Mono',monospace">ops/agent-queue.md</span></span><span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px solid #222;padding:0 4px">✓ verified</span></div>
+<div style="display:flex;gap:8px;align-items:center"><span style="width:18px;height:18px;border:1.5px dashed #2f6fd6;border-radius:50%;flex:none"></span><span style="flex:1">waiting for a reply in <span style="font-family:'JetBrains Mono',monospace">agent-replies.md</span>…</span><span style="font-size:11px;color:#777">2m</span></div>
+<div style="border:1.5px dashed #888;padding:8px;display:flex;flex-direction:column;gap:2px;font:10px/1.5 'JetBrains Mono',monospace;color:#444">
+<span style="color:#888">ops/agent-queue.md · preview</span>
+<span># seams tasks</span><span>## T-001 connection test</span><span>- source: launcher setup</span><span>- do: append "ack T-001" to agent-replies.md</span></div>
+<div style="display:flex;flex-direction:column;gap:4px;border-top:1px dashed #aaa;padding-top:8px"><span>When the reply shows up:</span><div style="display:flex;justify-content:space-between;align-items:center"><span>agent acknowledged T-001</span><span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px dashed #888;color:#666;padding:0 4px">asserted</span></div><span style="color:#777;font-size:11px">The launcher can see the reply but can't confirm what did the work.</span></div>
+<div style="display:flex;gap:6px"><span style="border:1.5px solid #222;padding:3px 10px">Skip waiting ›</span><span style="border:1.5px solid #222;padding:3px 10px">Change route</span></div>
+</div></div></div>
+
+<div class="dv-opt" id="3d"><div class="dv-olabel"><a class="dv-oid" href="#3d">3d</a><span><a class="dv-oid" href="#2d">2d</a> after setup: the Agent tab now says where hand-offs go and what came back. Nothing here is a conversation.</span></div>
+<div class="dv-card" style="width:380px;font-family:'Kalam',cursive;color:#222">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1.5px solid #222;background:#f4f3ef"><div style="flex:1;font-weight:700;font-size:14px">seams launcher</div><div style="display:flex;border:1.5px solid #222;font-size:11px"><span style="padding:1px 8px">Manage</span><span style="padding:1px 8px;background:#2f6fd6;color:#fff">Agent · 2</span></div></div>
+<div style="padding:5px 10px;border-bottom:1px solid #ccc;font:10px 'JetBrains Mono',monospace;color:#555;display:flex;justify-content:space-between"><span>→ ops/agent-queue.md</span><span>last read: asserted 14:20</span></div>
+<div style="display:flex;border-bottom:1.5px solid #222;font-size:12px;text-align:center">
+<div style="flex:1;padding:6px 0;border-right:1px solid #ccc;background:#222;color:#fff">To hand off · 2</div><div style="flex:1;padding:6px 0;border-right:1px solid #ccc">Handed off · 1</div><div style="flex:1;padding:6px 0">Replies · 1</div></div>
+<div style="padding:10px;display:flex;flex-direction:column;gap:7px;font-size:12px">
+<div style="display:flex;gap:6px;border:1.5px solid #c98a00;padding:6px"><span>☑</span><div style="flex:1;display:flex;flex-direction:column"><b>grow shared-corpus</b><span style="font:10px 'JetBrains Mono',monospace;color:#555">grow_ref → seeds/shared-corpus</span></div><span style="font-size:11px;color:#777">Conform</span></div>
+<div style="display:flex;gap:6px;border:1.5px solid #222;padding:6px"><span>☑</span><div style="flex:1;display:flex;flex-direction:column"><b>send: "hello from node-7"</b><span style="font:10px 'JetBrains Mono',monospace;color:#555">message · origin authored</span></div><span style="font-size:11px;color:#777">Hello</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="color:#555">Goal (one line)</span><div style="border:1.5px solid #222;padding:4px 6px">get to green before Friday</div></div>
+<div style="display:flex;gap:6px"><span style="border:1.5px solid #2f6fd6;background:#2f6fd6;color:#fff;padding:3px 10px">Write 2 tasks to outbox</span><span style="border:1.5px solid #222;padding:3px 10px">Copy</span></div>
+<div style="border-top:1px dashed #aaa;padding-top:7px;display:flex;flex-direction:column;gap:4px"><span style="font-size:11px;color:#777">latest reply</span>
+<div style="display:flex;justify-content:space-between;align-items:center"><span>T-003 repair log: "done"</span><span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px dashed #888;color:#666;padding:0 4px">asserted</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center"><span>hello now reports integrity ok</span><span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px solid #222;padding:0 4px">✓ verified</span></div></div>
+</div></div></div>
+
+</div>
+<p class="dv-next">Try next: "move to hi-fi on <a class="dv-oid" href="#2a">2a</a>" · "wireframe Keys, Config, Baseline tabs in this frame" · "spec the agent-queue.md format"</p>
+</section>
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Combining them: <a class="dv-oid" href="#1b">1b</a> tabs + <a class="dv-oid" href="#1c">1c</a> status marks, <a class="dv-oid" href="#1d">1d</a> as the issue view, <a class="dv-oid" href="#1e">1e</a> as the agent queue</span></div>
+<div style="max-width:760px;margin:0 0 24px;font:13px/1.5 'Kalam',cursive;color:#333">One window, two modes in the title bar: <b>Manage</b> (I edit the fields) · <b>Agent</b> (I pick what my agent should work on). Any problem you see has <span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px solid #2f6fd6;color:#2f6fd6;padding:0 4px">+ queue</span> next to it, so you can hand it off without writing it out. The launcher only builds the task list. Your agent does the work.</div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2a"><div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a><span>Tabs with status marks. Each tab shows its state at a glance (from <a class="dv-oid" href="#1a">1a</a>). Shown: Components, triage turned into actions.</span></div>
+<div class="dv-card" style="width:380px;font-family:'Kalam',cursive;color:#222">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1.5px solid #222;background:#f4f3ef"><div style="flex:1;font-weight:700;font-size:14px">seams launcher</div><div style="display:flex;border:1.5px solid #222;font-size:11px"><span style="padding:1px 8px;background:#222;color:#fff">Manage</span><span style="padding:1px 8px">Agent · 2</span></div><div style="font-size:14px">— ×</div></div>
+<div style="padding:5px 10px;border-bottom:1px solid #ccc;font:10px 'JetBrains Mono',monospace;color:#555;display:flex;justify-content:space-between"><span>wire 0.3-draft ✓ pinned</span><span>gate 2 kinds</span><span style="color:#2e8b57">integrity ok</span></div>
+<div style="display:flex;border-bottom:1.5px solid #222;font-size:12px">
+<div style="flex:1;text-align:center;padding:5px 0;border-right:1px solid #ccc;display:flex;flex-direction:column"><span>Keys</span><span style="font-size:10px;color:#2e8b57">✓</span></div>
+<div style="flex:1;text-align:center;padding:5px 0;border-right:1px solid #ccc;display:flex;flex-direction:column"><span>Config</span><span style="font-size:10px;color:#c43b2b;font-weight:700">! 1</span></div>
+<div style="flex:1;text-align:center;padding:5px 0;border-right:1px solid #ccc;display:flex;flex-direction:column;background:#222;color:#fff"><span>Parts</span><span style="font-size:10px">3/8</span></div>
+<div style="flex:1;text-align:center;padding:5px 0;border-right:1px solid #ccc;display:flex;flex-direction:column"><span>Conform</span><span style="font-size:10px;color:#c98a00">2 gap</span></div>
+<div style="flex:1;text-align:center;padding:5px 0;border-right:1px solid #ccc;display:flex;flex-direction:column"><span>Hello</span><span style="font-size:10px;color:#999">—</span></div>
+<div style="flex:1;text-align:center;padding:5px 0;display:flex;flex-direction:column"><span>Baseline</span><span style="font-size:10px;color:#999">—</span></div>
+</div>
+<div style="padding:10px;display:flex;flex-direction:column;gap:6px;font-size:12px">
+<div style="display:flex;justify-content:space-between;color:#777;font-size:11px"><span>component · your call</span><span>next step</span></div>
+<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #ddd;padding:4px 0"><span style="color:#2e8b57;width:12px">✓</span><span style="flex:1">identity <span style="color:#777">· 1:1</span></span><span style="border:1.5px solid #222;padding:1px 8px">Route ›</span></div>
+<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #ddd;padding:4px 0"><span style="color:#2e8b57;width:12px">✓</span><span style="flex:1">keeper <span style="color:#777">· none</span></span><span style="border:1.5px solid #222;padding:1px 8px">Grow from seed ›</span></div>
+<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #ddd;padding:4px 0"><span style="color:#2e8b57;width:12px">✓</span><span style="flex:1">persona <span style="color:#777">· different</span></span><span style="border:1.5px solid #222;padding:1px 8px">Align ›</span></div>
+<div style="display:flex;flex-direction:column;gap:5px;border:1.5px solid #222;padding:6px;background:#fbfbf8">
+<div style="display:flex;align-items:center;gap:6px"><span style="width:12px">○</span><b style="flex:1">expert-service</b><span style="color:#c98a00;font-size:11px">not triaged</span></div>
+<div style="padding-left:18px;color:#555">Do you already have this?</div>
+<div style="padding-left:18px;display:flex;gap:5px;font-size:11px"><span style="border:1.5px solid #222;padding:1px 6px">No → grow</span><span style="border:1.5px solid #222;padding:1px 6px">Sort of → align</span><span style="border:1.5px solid #222;padding:1px 6px">Yes → route</span></div>
+<div style="padding-left:18px"><span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px solid #2f6fd6;color:#2f6fd6;padding:0 4px">+ queue for agent</span></div></div>
+<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #ddd;padding:4px 0;color:#777"><span style="width:12px">○</span><span style="flex:1">shared-corpus</span><span style="font-size:11px">not triaged ›</span></div>
+<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #ddd;padding:4px 0;color:#999"><span style="width:12px">–</span><span style="flex:1">lapis-pm <i>(optional)</i></span><span style="font-size:11px">skipped</span></div>
+<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #ddd;padding:4px 0;color:#777"><span style="width:12px">○</span><span style="flex:1">governance</span><span style="font-size:11px;color:#555">declared · revisit 11-15</span></div>
+<div style="display:flex;align-items:center;gap:6px;padding:4px 0"><span style="color:#c98a00;width:12px">◐</span><span style="flex:1">endpoint-surface <span style="font:10px 'JetBrains Mono',monospace;color:#555">hello ☑ emit ☑ export ☐</span></span><span style="font-size:11px">›</span></div>
+</div></div></div>
+
+<div class="dv-opt" id="2b"><div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a><span>Same idea, square (from <a class="dv-oid" href="#1c">1c</a>). Click Config's ! to see the problem, fix it here or queue it.</span></div>
+<div class="dv-card" style="width:480px;height:480px;font-family:'Kalam',cursive;color:#222;display:flex;flex-direction:column">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1.5px solid #222;background:#f4f3ef"><div style="flex:1;font-weight:700;font-size:14px">seams launcher</div><div style="display:flex;border:1.5px solid #222;font-size:11px"><span style="padding:1px 8px;background:#222;color:#fff">Manage</span><span style="padding:1px 8px">Agent · 2</span></div></div>
+<div style="padding:5px 10px;border-bottom:1px solid #ccc;font:10px 'JetBrains Mono',monospace;color:#555;display:flex;gap:14px"><span>wire 0.3-draft ✓ pinned</span><span>gate {node-key, session-log}</span><span style="color:#2e8b57">integrity ok</span></div>
+<div style="display:flex;flex:1;min-height:0">
+<div style="width:124px;border-right:1.5px solid #222;display:flex;flex-direction:column;font-size:13px">
+<div style="padding:8px 10px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between"><span>Keys</span><span style="color:#2e8b57">✓</span></div>
+<div style="padding:8px 10px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;background:#222;color:#fff"><span>Config</span><span style="color:#ff9b8f;font-weight:700">! 1</span></div>
+<div style="padding:8px 10px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between"><span>Parts</span><span style="font-size:11px;color:#777">3/8</span></div>
+<div style="padding:8px 10px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between"><span>Conform</span><span style="font-size:11px;color:#c98a00">2</span></div>
+<div style="padding:8px 10px;border-bottom:1px solid #ddd">Hello world</div>
+<div style="padding:8px 10px;border-bottom:1px solid #ddd">Baseline</div></div>
+<div style="flex:1;padding:10px;display:flex;flex-direction:column;gap:8px;font-size:12px;overflow:hidden">
+<div style="display:flex;border-bottom:1.5px solid #222;font-size:12px;gap:12px"><span style="padding-bottom:3px">node.yaml</span><span style="padding-bottom:3px;border-bottom:3px solid #222;font-weight:700">declarations.yaml <span style="color:#c43b2b">!</span></span></div>
+<div style="border:1.5px solid #c43b2b;padding:7px;display:flex;flex-direction:column;gap:4px;background:#fbeeec">
+<div style="display:flex;justify-content:space-between"><b>tls-off-local</b><span style="color:#c43b2b;font-weight:700">expired → re-escalated</span></div>
+<div style="color:#555">accepted deviation · revisit was 2026-10-20</div>
+<div style="display:flex;gap:5px;font-size:11px;flex-wrap:wrap"><span style="border:1.5px solid #222;padding:1px 6px">Renew + new date</span><span style="border:1.5px solid #222;padding:1px 6px">Resolve</span><span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px solid #2f6fd6;color:#2f6fd6;padding:1px 5px">+ queue for agent</span></div></div>
+<div style="border:1.5px dashed #888;padding:7px;display:flex;justify-content:space-between"><b>governance-deferred</b><span style="color:#555">revisit 2026-11-15</span></div>
+<div style="border:1.5px dashed #888;padding:7px;display:flex;justify-content:space-between"><b>no-shared-corpus</b><span style="color:#555">revisit 2026-12-01</span></div>
+<div style="margin-top:auto;display:flex;gap:6px;align-items:center"><span style="border:1.5px solid #222;padding:2px 8px">+ Add declaration</span><span style="font:10px 'JetBrains Mono',monospace;color:#888">ops/declarations.yaml · saved</span></div>
+</div></div></div></div>
+
+<div class="dv-opt" id="2c"><div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a><span>Issue detail (<a class="dv-oid" href="#1d">1d</a> as a drill-in): click a red mark on any tab, get what / why / still works, plus "hand to agent".</span></div>
+<div class="dv-card" style="width:380px;font-family:'Kalam',cursive;color:#222">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1.5px solid #222;background:#f4f3ef"><div style="flex:1;font-weight:700;font-size:14px">seams launcher</div><div style="display:flex;border:1.5px solid #222;font-size:11px"><span style="padding:1px 8px;background:#222;color:#fff">Manage</span><span style="padding:1px 8px">Agent · 2</span></div></div>
+<div style="padding:5px 10px;border-bottom:1px solid #ccc;font:10px 'JetBrains Mono',monospace;color:#555;display:flex;justify-content:space-between"><span>wire 0.3-draft ✓ pinned</span><span>gate 2 kinds</span><span style="color:#c43b2b;font-weight:600">QUARANTINED</span></div>
+<div style="padding:8px 10px;border-bottom:1px solid #ccc;font-size:13px">‹ Baseline  /  <b>Integrity</b></div>
+<div style="padding:10px;border-bottom:1.5px solid #c43b2b;background:#fbeeec;display:flex;flex-direction:column;gap:4px;font-size:12px">
+<div style="display:flex;justify-content:space-between"><b style="color:#c43b2b;font-size:15px">Log quarantined</b><span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px dashed #c43b2b;color:#c43b2b;padding:0 4px;height:14px">reported by hello</span></div>
+<div>Sending is paused. The launcher won't emit into a corrupted log.</div></div>
+<div style="padding:10px;display:flex;flex-direction:column;gap:9px;font-size:12px">
+<div style="display:flex;flex-direction:column;gap:3px"><b>What</b><div style="font:10px/1.5 'JetBrains Mono',monospace;color:#444">quarantine.jsonl — 2 lines<br>· line 37  chain prev mismatch<br>· line 38  unparseable</div></div>
+<div style="display:flex;flex-direction:column;gap:3px"><b>Why it matters</b><div>export refuses: <span style="font-family:'JetBrains Mono',monospace">503 log_integrity</span></div></div>
+<div style="display:flex;gap:16px"><div style="display:flex;flex-direction:column;gap:2px;flex:1"><b>Still works</b><span>☑ Keys · Config · Parts</span><span>☑ Conform (local)</span><span>☑ Hello (read-only)</span></div>
+<div style="display:flex;flex-direction:column;gap:2px;flex:1;color:#999"><b style="color:#222">Blocked</b><span>☒ Emit (paused)</span><span>☒ Export (503)</span></div></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap"><span style="border:1.5px solid #222;padding:3px 10px">View quarantine.jsonl</span><span style="border:1.5px solid #222;padding:3px 10px">Re-check</span></div>
+<div style="border:1.5px solid #2f6fd6;padding:8px;display:flex;flex-direction:column;gap:5px">
+<div style="display:flex;justify-content:space-between;align-items:center"><b style="color:#2f6fd6">Hand to agent</b><span style="font-size:11px;color:#777">adds to Agent queue</span></div>
+<div style="color:#555">Attaches: the 2 quarantined lines, the hello result, chain state at n=36.</div>
+<div style="display:flex;gap:6px"><span style="border:1.5px solid #2f6fd6;background:#2f6fd6;color:#fff;padding:2px 10px">+ Queue "repair log"</span></div></div>
+</div></div></div>
+
+<div class="dv-opt" id="2d"><div class="dv-olabel"><a class="dv-oid" href="#2d">2d</a><span>Agent mode (<a class="dv-oid" href="#1e">1e</a> reworked): the queue of what you picked. Each item says where it came from; you add a goal and hand off a structured packet, no write-up needed.</span></div>
+<div class="dv-card" style="width:380px;font-family:'Kalam',cursive;color:#222">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1.5px solid #222;background:#f4f3ef"><div style="flex:1;font-weight:700;font-size:14px">seams launcher</div><div style="display:flex;border:1.5px solid #222;font-size:11px"><span style="padding:1px 8px">Manage</span><span style="padding:1px 8px;background:#2f6fd6;color:#fff">Agent · 3</span></div></div>
+<div style="padding:5px 10px;border-bottom:1px solid #ccc;font:10px 'JetBrains Mono',monospace;color:#555;display:flex;justify-content:space-between"><span>wire 0.3-draft ✓ pinned</span><span>gate 2 kinds</span><span style="color:#c43b2b;font-weight:600">QUARANTINED</span></div>
+<div style="display:flex;border-bottom:1.5px solid #222;font-size:12px;text-align:center">
+<div style="flex:1;padding:6px 0;border-right:1px solid #ccc"><b style="color:#c43b2b">1</b> problem</div><div style="flex:1;padding:6px 0;border-right:1px solid #ccc"><b style="color:#c98a00">2</b> gaps</div><div style="flex:1;padding:6px 0"><b>0</b> messages</div></div>
+<div style="padding:10px;display:flex;flex-direction:column;gap:7px;font-size:12px">
+<div style="display:flex;justify-content:space-between;color:#777;font-size:11px"><span>queued for your agent</span><span>from</span></div>
+<div style="display:flex;gap:6px;align-items:flex-start;border:1.5px solid #c43b2b;padding:6px"><span>☑</span><div style="flex:1;display:flex;flex-direction:column"><b>repair quarantined log</b><span style="font:10px 'JetBrains Mono',monospace;color:#555">2 lines · 503 log_integrity</span></div><span style="font-size:11px;color:#777">Integrity</span></div>
+<div style="display:flex;gap:6px;align-items:flex-start;border:1.5px solid #c98a00;padding:6px"><span>☑</span><div style="flex:1;display:flex;flex-direction:column"><b>grow shared-corpus</b><span style="font:10px 'JetBrains Mono',monospace;color:#555">grow_ref → seeds/shared-corpus</span></div><span style="font-size:11px;color:#777">Conform</span></div>
+<div style="display:flex;gap:6px;align-items:flex-start;border:1.5px solid #c98a00;padding:6px"><span>☐</span><div style="flex:1;display:flex;flex-direction:column"><b>triage expert-service</b><span style="font:10px 'JetBrains Mono',monospace;color:#555">none / different / 1:1 ?</span></div><span style="font-size:11px;color:#777">Parts</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="color:#555">Goal (optional, one line)</span><div style="border:1.5px solid #222;padding:4px 6px;color:#999">e.g. get to green before Friday</div></div>
+<div style="border:1.5px dashed #888;padding:6px;display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;color:#777">packet preview · 2 tasks · each with its source + evidence</span><span style="font:10px 'JetBrains Mono',monospace;color:#444">agent-queue.json (format TBD)</span></div>
+<div style="display:flex;gap:6px;align-items:center"><span style="border:1.5px solid #2f6fd6;background:#2f6fd6;color:#fff;padding:3px 10px">Hand off 2 tasks</span><span style="border:1.5px solid #222;padding:3px 10px">Copy</span></div>
+<div style="font-size:11px;color:#777;border-top:1px dashed #aaa;padding-top:6px">When your agent reports back, items show as <span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px dashed #888;color:#666;padding:0 4px">asserted</span> until Conform re-runs and turns them <span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px solid #222;padding:0 4px">✓ verified</span>.</div>
+</div></div></div>
+
+</div>
+<p class="dv-next">Try next: "go with <a class="dv-oid" href="#2a">2a</a> tall, wireframe the rest of the tabs" · "how does the agent's report come back into <a class="dv-oid" href="#2d">2d</a>?" · "add a 'message I want to send' item type to the queue"</p>
+</section>
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Launcher — initial view, five structures</span></div>
+<div style="display:flex;gap:28px;align-items:flex-start;margin:0 0 28px;font:13px/1.5 'Kalam',cursive;color:#333">
+<div style="width:240px;height:135px;border:1.5px solid #222;border-radius:4px;background:#fafaf7;position:relative;flex:none">
+<div style="position:absolute;right:8px;bottom:8px;width:52px;height:96px;border:1.5px solid #2f6fd6;background:rgba(47,111,214,.12);border-radius:2px"></div>
+<div style="position:absolute;right:68px;bottom:8px;width:70px;height:70px;border:1.5px dashed #999;border-radius:2px"></div>
+<div style="position:absolute;left:8px;top:6px;font:11px 'JetBrains Mono',monospace;color:#999">1920×1080 desktop</div>
+</div>
+<div style="max-width:520px;display:flex;flex-direction:column;gap:6px">
+<div>Placement: docked bottom-right, ~20–25% of screen. Tall = 360–380×640 (blue). Square = 480×480 (dashed).</div>
+<div>Shared rules in every frame: <b>rails strip</b> under the title bar (hello result, always visible) · every value carries a tag <span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px solid #222;padding:0 4px">✓ verified</span> or <span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px dashed #888;color:#666;padding:0 4px">asserted</span> · NODE keys = square/dashed, HUMAN keys = round/solid, never in the same list · refusals shown by name, verbatim.</div>
+</div>
+</div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a><span>Setup checklist — one scrolling list of the six jobs, each expands inline. First-run view: Keys open.</span></div>
+<div class="dv-card" style="width:360px;font-family:'Kalam',cursive;color:#222">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1.5px solid #222;background:#f4f3ef"><div style="display:flex;gap:5px"><div style="width:10px;height:10px;border:1.5px solid #222;border-radius:50%"></div><div style="width:10px;height:10px;border:1.5px solid #222;border-radius:50%"></div><div style="width:10px;height:10px;border:1.5px solid #222;border-radius:50%"></div></div><div style="flex:1;font-weight:700;font-size:14px">seams launcher</div><div style="font:11px 'JetBrains Mono',monospace;color:#777">node: none yet</div></div>
+<div style="padding:8px 10px;border-bottom:1.5px solid #222;display:flex;flex-direction:column;gap:4px;font-size:12px">
+<div style="display:flex;justify-content:space-between;align-items:center"><span>wire <span style="font-family:'JetBrains Mono',monospace">0.3-draft</span> = pinned</span><span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px solid #222;padding:0 4px">✓ verified</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center"><span>gate <span style="font-family:'JetBrains Mono',monospace">{node-key, session-log}</span></span><span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px dashed #888;color:#666;padding:0 4px">asserted</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center"><span>integrity <b style="color:#2e8b57">ok</b></span><span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px dashed #888;color:#666;padding:0 4px">asserted</span></div>
+</div>
+<div style="display:flex;flex-direction:column">
+<div style="border-bottom:1px solid #ccc;padding:10px;background:#fbfbf8">
+<div style="display:flex;align-items:center;gap:8px"><div style="width:16px;height:16px;border:1.5px solid #222"></div><b style="flex:1">1 · Keys</b><span style="font-size:12px;color:#c98a00">no node key</span><span>▾</span></div>
+<div style="margin:10px 0 0 24px;display:flex;flex-direction:column;gap:8px;font-size:12px">
+<div style="border:1.5px dashed #222;padding:8px;display:flex;flex-direction:column;gap:6px"><div style="font:600 10px 'JetBrains Mono',monospace;letter-spacing:.08em">NODE KEYS</div><div style="color:#777">none minted</div><div style="display:flex;gap:6px"><div style="border:1.5px solid #222;padding:3px 10px;background:#222;color:#fff">Mint node key</div><div style="border:1.5px solid #bbb;padding:3px 10px;color:#aaa">Rotate</div></div><div style="font:10px 'JetBrains Mono',monospace;color:#777">register → role: node · status: active · valid_from: —</div></div>
+<div style="border:1.5px solid #222;border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:4px"><div style="font:600 10px 'JetBrains Mono',monospace;letter-spacing:.08em">HUMAN KEYS (yours)</div><div style="color:#777">separate class · not managed here</div></div>
+</div></div>
+<div style="border-bottom:1px solid #ccc;padding:10px;display:flex;align-items:center;gap:8px"><div style="width:16px;height:16px;border:1.5px solid #222"></div><b style="flex:1">2 · Config</b><span style="font-size:12px;color:#c43b2b">1 declaration expired</span><span>▸</span></div>
+<div style="border-bottom:1px solid #ccc;padding:10px;display:flex;align-items:center;gap:8px"><div style="width:16px;height:16px;border:1.5px solid #222"></div><b style="flex:1">3 · Components</b><span style="font-size:12px;color:#777">0 / 8 triaged</span><span>▸</span></div>
+<div style="border-bottom:1px solid #ccc;padding:10px;display:flex;align-items:center;gap:8px"><div style="width:16px;height:16px;border:1.5px solid #222"></div><b style="flex:1">4 · Conform</b><span style="font-size:12px;color:#777">not run</span><span>▸</span></div>
+<div style="border-bottom:1px solid #ccc;padding:10px;display:flex;align-items:center;gap:8px;color:#999"><div style="width:16px;height:16px;border:1.5px solid #bbb"></div><b style="flex:1">5 · Hello world</b><span style="font-size:12px">needs node key</span><span>▸</span></div>
+<div style="border-bottom:1px solid #ccc;padding:10px;display:flex;align-items:center;gap:8px"><div style="width:16px;height:16px;border:1.5px solid #222"></div><b style="flex:1">6 · Baseline</b><span style="font-size:12px;color:#777">view / export</span><span>▸</span></div>
+</div>
+<div style="padding:8px 10px;font:10px 'JetBrains Mono',monospace;color:#888;display:flex;justify-content:space-between"><span>local only</span><span>exposure: blocked-on-ruling</span></div>
+</div></div>
+
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a><span>Tabs — six short tabs across the top. Shown: Hello world as a 4-step run with receipt + replay proof.</span></div>
+<div class="dv-card" style="width:380px;font-family:'Kalam',cursive;color:#222">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1.5px solid #222;background:#f4f3ef"><div style="flex:1;font-weight:700;font-size:14px">seams launcher</div><div style="font:11px 'JetBrains Mono',monospace;color:#777">0.3-draft ✓ · ok</div><div style="font-size:14px">— ×</div></div>
+<div style="display:flex;border-bottom:1.5px solid #222;font-size:12px">
+<div style="flex:1;text-align:center;padding:6px 0;border-right:1px solid #ccc">Keys</div><div style="flex:1;text-align:center;padding:6px 0;border-right:1px solid #ccc">Config</div><div style="flex:1;text-align:center;padding:6px 0;border-right:1px solid #ccc">Parts</div><div style="flex:1;text-align:center;padding:6px 0;border-right:1px solid #ccc">Conform</div><div style="flex:1;text-align:center;padding:6px 0;border-right:1px solid #ccc;background:#222;color:#fff">Hello</div><div style="flex:1;text-align:center;padding:6px 0">Baseline</div>
+</div>
+<div style="padding:10px;display:flex;flex-direction:column;gap:10px;font-size:12px">
+<div style="display:flex;gap:8px"><div style="width:18px;height:18px;border:1.5px solid #222;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none">✓</div><div style="flex:1"><b>hello handshake</b> — echo <span style="font-family:'JetBrains Mono',monospace">0.3-draft</span> matches pin</div><span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px solid #222;padding:0 4px;height:14px">✓ verified</span></div>
+<div style="display:flex;gap:8px"><div style="width:18px;height:18px;border:1.5px solid #222;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none">✓</div><div style="flex:1"><b>node-key announce</b> — accepted, kind node-key</div><span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px dashed #888;color:#666;padding:0 4px;height:14px">asserted</span></div>
+<div style="display:flex;gap:8px"><div style="width:18px;height:18px;border:1.5px solid #2f6fd6;background:#2f6fd6;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none">3</div><div style="flex:1;display:flex;flex-direction:column;gap:6px"><b>emit one deposit</b>
+<div style="border:1.5px solid #222;height:44px;padding:4px 6px;color:#555">hello, network</div>
+<div style="display:flex;justify-content:space-between;color:#777"><span>origin: ◉ authored ○ assisted ○ played</span><span style="font-family:'JetBrains Mono',monospace">14 / 8000</span></div>
+<div style="display:flex;gap:6px"><div style="border:1.5px solid #222;padding:3px 10px;background:#222;color:#fff">Emit</div><div style="border:1.5px dashed #aaa;padding:3px 8px;color:#999">Fork / remix — not yet built (501)</div></div>
+<div style="border-top:1px dashed #aaa;padding-top:6px;display:flex;flex-direction:column;gap:3px"><div>gate mapped text → <span style="font-family:'JetBrains Mono',monospace">session-log</span> <span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px solid #222;padding:0 4px">✓ checked by launcher</span></div>
+<div style="font:10px/1.4 'JetBrains Mono',monospace;color:#444;word-break:break-all">payload_hash 9f2c41e0a7…(full, unformatted)<br>content_hash 03ab77d1c9…<br>deposit_hash e81f0b52aa…</div>
+<div style="color:#777">hashes are opaque — shown as received · [copy]</div></div>
+</div></div>
+<div style="display:flex;gap:8px;color:#999"><div style="width:18px;height:18px;border:1.5px solid #bbb;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none">4</div><div style="flex:1"><b>replay proof</b> — expect duplicate:true, byte-identical receipt, log n unchanged</div></div>
+<div style="border:1.5px solid #c43b2b;padding:6px;color:#c43b2b;font-size:11px">last refusal: <span style="font-family:'JetBrains Mono',monospace">too_long 413</span> — over 8000 chars. Didn't count against rate budget.</div>
+</div></div></div>
+
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a><span>Square, side list — 480×480, nav on the left, one pane right. Shown: Components three-way triage.</span></div>
+<div class="dv-card" style="width:480px;height:480px;font-family:'Kalam',cursive;color:#222;display:flex;flex-direction:column">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1.5px solid #222;background:#f4f3ef"><div style="flex:1;font-weight:700;font-size:14px">seams launcher</div><div style="font:11px 'JetBrains Mono',monospace;color:#777">wire 0.3-draft ✓ · gate 2 kinds · ok</div></div>
+<div style="display:flex;flex:1;min-height:0">
+<div style="width:118px;border-right:1.5px solid #222;display:flex;flex-direction:column;font-size:13px">
+<div style="padding:8px 10px;border-bottom:1px solid #ddd">○ Keys</div><div style="padding:8px 10px;border-bottom:1px solid #ddd">○ Config <span style="color:#c43b2b">!</span></div><div style="padding:8px 10px;border-bottom:1px solid #ddd;background:#222;color:#fff">◐ Components</div><div style="padding:8px 10px;border-bottom:1px solid #ddd">○ Conform</div><div style="padding:8px 10px;border-bottom:1px solid #ddd">○ Hello world</div><div style="padding:8px 10px;border-bottom:1px solid #ddd">○ Baseline</div>
+<div style="margin-top:auto;padding:8px 10px;font:9px 'JetBrains Mono',monospace;color:#888">local only</div></div>
+<div style="flex:1;padding:10px;display:flex;flex-direction:column;gap:5px;font-size:12px;overflow:hidden">
+<div style="display:flex;justify-content:space-between;color:#777;font-size:11px"><span>component</span><span>none→grow · diff→align · 1:1→route</span></div>
+<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #ddd;padding:3px 0"><span style="flex:1">identity</span><div style="display:flex;border:1.5px solid #222;font-size:11px"><span style="padding:1px 6px;border-right:1px solid #222">grow</span><span style="padding:1px 6px;border-right:1px solid #222">align</span><span style="padding:1px 6px;background:#222;color:#fff">route</span></div></div>
+<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #ddd;padding:3px 0"><span style="flex:1">keeper</span><div style="display:flex;border:1.5px solid #222;font-size:11px"><span style="padding:1px 6px;border-right:1px solid #222;background:#222;color:#fff">grow</span><span style="padding:1px 6px;border-right:1px solid #222">align</span><span style="padding:1px 6px">route</span></div></div>
+<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #ddd;padding:3px 0"><span style="flex:1">persona</span><div style="display:flex;border:1.5px solid #222;font-size:11px"><span style="padding:1px 6px;border-right:1px solid #222">grow</span><span style="padding:1px 6px;border-right:1px solid #222;background:#222;color:#fff">align</span><span style="padding:1px 6px">route</span></div></div>
+<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #ddd;padding:3px 0"><span style="flex:1">expert-service</span><div style="display:flex;border:1.5px solid #bbb;color:#aaa;font-size:11px"><span style="padding:1px 6px;border-right:1px solid #bbb">grow</span><span style="padding:1px 6px;border-right:1px solid #bbb">align</span><span style="padding:1px 6px">route</span></div></div>
+<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #ddd;padding:3px 0"><span style="flex:1">shared-corpus</span><div style="display:flex;border:1.5px solid #bbb;color:#aaa;font-size:11px"><span style="padding:1px 6px;border-right:1px solid #bbb">grow</span><span style="padding:1px 6px;border-right:1px solid #bbb">align</span><span style="padding:1px 6px">route</span></div></div>
+<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #ddd;padding:3px 0;color:#888"><span style="flex:1">lapis-pm <i>(optional)</i></span><div style="display:flex;border:1.5px dashed #bbb;color:#aaa;font-size:11px"><span style="padding:1px 6px">skip</span></div></div>
+<div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #ddd;padding:3px 0"><span style="flex:1">governance</span><div style="display:flex;border:1.5px solid #bbb;color:#aaa;font-size:11px"><span style="padding:1px 6px;border-right:1px solid #bbb">grow</span><span style="padding:1px 6px;border-right:1px solid #bbb">align</span><span style="padding:1px 6px">route</span></div></div>
+<div style="display:flex;flex-direction:column;gap:3px;border-bottom:1px solid #ddd;padding:3px 0"><span>endpoint-surface</span><div style="display:flex;gap:10px;font:10px 'JetBrains Mono',monospace;color:#444;padding-left:10px"><span>☑ hello</span><span>☑ emit</span><span>☐ export</span></div></div>
+<div style="margin-top:auto;border:1.5px dashed #888;padding:6px;font-size:11px;color:#555">keeper → grow from seed: <span style="font-family:'JetBrains Mono',monospace">grow_ref seeds/keeper</span> · [open]</div>
+</div></div></div></div>
+
+<div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a><span>Quarantine state — <a class="dv-oid" href="#1a">1a</a>'s frame when hello reports QUARANTINED. Takes over the top; says what, why, what still works.</span></div>
+<div class="dv-card" style="width:360px;font-family:'Kalam',cursive;color:#222">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1.5px solid #222;background:#f4f3ef"><div style="flex:1;font-weight:700;font-size:14px">seams launcher</div><div style="font:11px 'JetBrains Mono',monospace;color:#c43b2b">QUARANTINED</div></div>
+<div style="padding:10px;border-bottom:1.5px solid #c43b2b;background:#fbeeec;display:flex;flex-direction:column;gap:6px;font-size:12px">
+<div style="display:flex;justify-content:space-between"><b style="color:#c43b2b;font-size:15px">Log quarantined</b><span style="font:600 10px 'JetBrains Mono',monospace;border:1.5px dashed #c43b2b;color:#c43b2b;padding:0 4px;height:14px">reported by hello</span></div>
+<div>Sending is paused. The launcher won't emit into a corrupted log.</div>
+</div>
+<div style="padding:10px;display:flex;flex-direction:column;gap:10px;font-size:12px">
+<div style="display:flex;flex-direction:column;gap:3px"><b>What</b><div style="font:10px/1.5 'JetBrains Mono',monospace;color:#444">quarantine.jsonl — 2 lines<br>· line 37  chain prev mismatch<br>· line 38  unparseable</div></div>
+<div style="display:flex;flex-direction:column;gap:3px"><b>Why it matters</b><div>export refuses: <span style="font-family:'JetBrains Mono',monospace">503 log_integrity</span></div></div>
+<div style="display:flex;flex-direction:column;gap:4px"><b>Still works</b>
+<div style="display:flex;justify-content:space-between"><span>☑ Keys, Config, Components</span><span style="color:#777">local</span></div>
+<div style="display:flex;justify-content:space-between"><span>☑ Conform runner</span><span style="color:#777">local</span></div>
+<div style="display:flex;justify-content:space-between"><span>☑ Hello</span><span style="color:#777">read-only</span></div></div>
+<div style="display:flex;flex-direction:column;gap:4px;color:#999"><b style="color:#222">Blocked</b>
+<div>☒ Emit — paused by launcher</div><div>☒ Baseline export — server 503</div></div>
+<div style="display:flex;gap:6px"><div style="border:1.5px solid #222;padding:3px 10px">View quarantine.jsonl</div><div style="border:1.5px solid #222;padding:3px 10px">Re-check</div></div>
+</div>
+<div style="padding:8px 10px;border-top:1px solid #ccc;font:10px 'JetBrains Mono',monospace;color:#888">last ok hello: 14:02 · now 14:31</div>
+</div></div>
+
+<div class="dv-opt" id="1e"><div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a><span>Compact stack — 320×440, home is a status card, each job drills in with ‹ back. Shown: Conform gap report.</span></div>
+<div class="dv-card" style="width:320px;height:440px;font-family:'Kalam',cursive;color:#222;display:flex;flex-direction:column">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1.5px solid #222;background:#f4f3ef"><span style="font-size:14px">‹ Node</span><div style="flex:1;text-align:center;font-weight:700;font-size:14px">Conform</div><span style="font-size:12px;color:#777">● ok</span></div>
+<div style="display:flex;border-bottom:1.5px solid #222;font-size:12px;text-align:center">
+<div style="flex:1;padding:8px 0;border-right:1px solid #ccc"><b style="font-size:18px;color:#2e8b57">5</b><br>green</div>
+<div style="flex:1;padding:8px 0;border-right:1px solid #ccc"><b style="font-size:18px;color:#c98a00">2</b><br>gap</div>
+<div style="flex:1;padding:8px 0"><b style="font-size:18px;color:#555">1</b><br>dated-declared</div></div>
+<div style="padding:10px;display:flex;flex-direction:column;gap:8px;font-size:12px;flex:1;overflow:hidden">
+<div style="border:1.5px solid #c98a00;padding:6px;display:flex;flex-direction:column;gap:2px"><div style="display:flex;justify-content:space-between"><b>shared-corpus missing</b><span style="color:#c98a00">gap</span></div><div style="font:10px 'JetBrains Mono',monospace;color:#555">grow_ref → seeds/shared-corpus</div></div>
+<div style="border:1.5px solid #c98a00;padding:6px;display:flex;flex-direction:column;gap:2px"><div style="display:flex;justify-content:space-between"><b>export endpoint absent</b><span style="color:#c98a00">gap</span></div><div style="font:10px 'JetBrains Mono',monospace;color:#555">grow_ref → surface/export</div></div>
+<div style="border:1.5px dashed #888;padding:6px;display:flex;flex-direction:column;gap:2px"><div style="display:flex;justify-content:space-between"><b>governance deferred</b><span style="color:#555">declared</span></div><div style="font-size:11px;color:#777">revisit 2026-11-15 — re-escalates on its own</div></div>
+<div style="color:#777;font-size:11px">+ 5 green (collapsed)</div>
+</div>
+<div style="padding:8px 10px;border-top:1.5px solid #222;display:flex;gap:6px;align-items:center"><div style="border:1.5px solid #222;padding:3px 10px;background:#222;color:#fff;font-size:12px">Run again</div><span style="font:10px 'JetBrains Mono',monospace;color:#888">last run 14:02 · local</span></div>
+</div></div>
+
+</div>
+<p class="dv-next">Try next: "go with <a class="dv-oid" href="#1a">1a</a>, show every section expanded" · "<a class="dv-oid" href="#1c">1c</a> square but vertical, with <a class="dv-oid" href="#1b">1b</a>'s hello flow" · "wireframe Baseline + Config screens"</p>
+</section>
+</x-dc>
+</body>
+</html>

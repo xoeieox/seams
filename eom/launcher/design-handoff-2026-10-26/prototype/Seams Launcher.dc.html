@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><style>body{margin:0}a{color:oklch(0.5 0.13 255)}a:hover{color:oklch(0.42 0.13 255)}button{font:inherit;cursor:pointer}button:disabled{cursor:default;opacity:.45}textarea,input{font:inherit}</style></helmet>
+<div style="{{ themeVars }}">
+<div style="min-height:100vh;background:var(--desk,#e4e3df);font:13px/1.45 'IBM Plex Sans',sans-serif;color:var(--ink,#1c1c1a)">
+<div style="position:fixed;right:20px;bottom:20px;width:380px;height:640px;max-height:calc(100vh - 40px);display:flex;flex-direction:column;background:var(--bg,#f6f6f4);border:1px solid var(--line2,#d6d5d0);border-radius:9px;box-shadow:0 10px 30px rgba(20,20,15,.18);overflow:hidden">
+
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px 8px 12px;border-bottom:1px solid var(--line,#e1e0dc);flex:none">
+<span style="flex:1;font-weight:600;font-size:13px">Seams Launcher</span>
+<sc-if value="{{ isTabs }}" hint-placeholder-val="{{ false }}"><div style="display:flex;padding:2px;border-radius:6px;background:var(--seg,#e9e9e6);font-size:11.5px">
+<button onClick="{{ toManage }}" style="{{ segManage }}">Manage</button>
+<button onClick="{{ toAgent }}" style="{{ segAgent }}">Agent <span style="color:var(--accent,oklch(0.5 0.13 255));font-weight:600">{{ queueCount }}</span></button>
+</div></sc-if>
+<sc-if value="{{ isSetup }}" hint-placeholder-val="{{ true }}"><span style="font:11px 'IBM Plex Mono',monospace;color:var(--ink3,#8a8982)">setup {{ doneCount }}/7</span></sc-if>
+<button onClick="{{ openGuide }}" title="Setup guide" style="width:22px;height:22px;border-radius:5px;border:1px solid var(--line2,#d6d5d0);background:var(--btn,#fff);color:var(--ink2,#55544f);font-size:11px;padding:0">?</button>
+<button onClick="{{ toggleTheme }}" title="Light / dark" style="width:22px;height:22px;border-radius:5px;border:1px solid var(--line2,#d6d5d0);background:var(--btn,#fff);color:var(--ink2,#55544f);font-size:12px;padding:0">◐</button>
+</div>
+
+<div style="display:flex;gap:12px;align-items:center;padding:6px 12px;background:var(--bar,#efefec);border-bottom:1px solid var(--line,#e1e0dc);font:11px 'IBM Plex Mono',monospace;color:var(--ink2,#55544f);flex:none">
+<span title="hello echo matches the pinned wire version" style="white-space:nowrap">wire 0.3-draft <span style="color:var(--ok,oklch(0.52 0.12 150))">✓ pinned</span></span>
+<span title="accepted kinds: {node-key, session-log}" style="white-space:nowrap">gate 2 kinds</span>
+<button onClick="{{ openIssue }}" style="{{ integrityStyle }}">{{ integrityLabel }}</button>
+</div>
+
+<sc-if value="{{ showQBanner }}" hint-placeholder-val="{{ false }}"><button onClick="{{ openIssue }}" style="display:flex;gap:8px;align-items:center;text-align:left;padding:7px 12px;border:none;border-bottom:1px solid var(--bad,oklch(0.55 0.17 27));background:var(--badBg,oklch(0.96 0.02 27));color:var(--ink,#1c1c1a);font-size:12px;flex:none"><b style="color:var(--bad,oklch(0.55 0.17 27))">Log quarantined</b><span style="flex:1;color:var(--ink2,#55544f)">Sending is paused.</span><span style="color:var(--bad,oklch(0.55 0.17 27))">Details ›</span></button></sc-if>
+
+<sc-if value="{{ showTabBar }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:2px;padding:6px 8px;border-bottom:1px solid var(--line,#e1e0dc);font-size:12px;flex:none">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="6"><button onClick="{{ t.go }}" style="{{ t.style }}">{{ t.label }}<span style="{{ t.badgeStyle }}">{{ t.badge }}</span></button></sc-for>
+</div></sc-if>
+
+<div style="flex:1;min-height:0;overflow:auto">
+
+<sc-if value="{{ isSetup }}" hint-placeholder-val="{{ true }}">
+<div style="padding:16px 14px 8px;display:flex;flex-direction:column;gap:3px"><div style="font-weight:600;font-size:17px;letter-spacing:-.01em">Join the network as a node.</div><div style="color:var(--ink2,#55544f);font-size:12.5px;text-wrap:pretty">You set it up here. Agents do the work later. Every step can be done by hand or handed to your agent.</div></div>
+<div style="padding:0 10px 10px;display:flex;flex-direction:column;gap:2px">
+<sc-for list="{{ steps }}" as="s" hint-placeholder-count="7"><div onClick="{{ s.go }}" style="{{ s.rowStyle }}"><span style="{{ s.circStyle }}">{{ s.mark }}</span><div style="flex:1;display:flex;flex-direction:column;gap:8px"><span style="{{ s.textStyle }}"><span style="font-weight:500;color:var(--ink,#1c1c1a)">{{ s.title }}</span> · {{ s.desc }}</span><sc-if value="{{ s.current }}"><button onClick="{{ s.go }}" style="align-self:flex-start;padding:4px 14px;border-radius:6px;border:none;background:var(--accentBg,oklch(0.5 0.13 255));color:#fff;font-weight:500;font-size:12.5px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 1px 1px rgba(0,0,0,.12)">Start</button></sc-if></div><span style="font-size:11px;color:var(--ink3,#8a8982)">{{ s.hint }}</span></div></sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ showIssue }}" hint-placeholder-val="{{ false }}">
+<div style="padding:8px 12px;border-bottom:1px solid var(--line,#e1e0dc);font-size:12.5px;display:flex;gap:6px"><button onClick="{{ closeIssue }}" style="border:none;background:none;padding:0;color:var(--accent,oklch(0.5 0.13 255))">‹ Back</button><span style="color:var(--ink3,#8a8982)">/</span><b style="font-weight:500">Integrity</b></div>
+<div style="padding:12px;display:flex;flex-direction:column;gap:12px;font-size:12.5px">
+<div style="display:flex;flex-direction:column;gap:4px;padding:10px;border-radius:7px;background:var(--badBg,oklch(0.96 0.02 27));border:1px solid var(--bad,oklch(0.55 0.17 27))"><div style="display:flex;justify-content:space-between;align-items:center"><b style="color:var(--bad,oklch(0.55 0.17 27));font-size:14px;font-weight:600">Log quarantined</b><span style="font:500 10px 'IBM Plex Mono',monospace;padding:1px 5px;border-radius:4px;border:1px dashed var(--bad,oklch(0.55 0.17 27));color:var(--bad,oklch(0.55 0.17 27))">reported by hello</span></div><span style="color:var(--ink2,#55544f)">Sending is paused. The launcher won't emit into a corrupted log.</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font-weight:500">What</span><div style="font:11px/1.6 'IBM Plex Mono',monospace;color:var(--ink2,#55544f);padding:8px;border-radius:6px;background:var(--panel,#fff);border:1px solid var(--line,#e1e0dc)">quarantine.jsonl · 2 lines<br>line 37 · chain prev mismatch<br>line 38 · unparseable</div></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font-weight:500">Why it matters</span><span style="color:var(--ink2,#55544f)">Export refuses with <span style="font-family:'IBM Plex Mono',monospace">503 log_integrity</span>. A baseline can't be truthful until the chain is repaired.</span></div>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px"><div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:500">Still works</span><span style="color:var(--ink2,#55544f)">✓ Keys · Config · Parts</span><span style="color:var(--ink2,#55544f)">✓ Conform (local)</span><span style="color:var(--ink2,#55544f)">✓ Hello (read-only)</span></div><div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:500">Blocked</span><span style="color:var(--ink3,#8a8982)">✕ Emit (paused)</span><span style="color:var(--ink3,#8a8982)">✕ Export (503)</span></div></div>
+<div style="display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:7px;border:1px solid var(--accentLine,oklch(0.8 0.06 255));background:var(--panel,#fff)"><div style="display:flex;justify-content:space-between"><span style="font-weight:500;color:var(--accent,oklch(0.5 0.13 255))">Hand to agent</span><span style="font-size:11px;color:var(--ink3,#8a8982)">adds to Agent queue</span></div><span style="color:var(--ink2,#55544f)">Attaches the 2 quarantined lines, the hello result, and chain state at n=36.</span><button onClick="{{ queueRepair }}" style="align-self:flex-start;padding:4px 12px;border-radius:6px;border:none;background:var(--accentBg,oklch(0.5 0.13 255));color:#fff;font-weight:500;font-size:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22)">{{ repairLabel }}</button></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isKeys }}" hint-placeholder-val="{{ false }}">
+<div style="padding:12px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--line2,#d6d5d0);border-radius:3px;background:var(--panel,#fff)">
+<div style="display:flex;justify-content:space-between;align-items:center"><span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.1em;padding:2px 6px;border-radius:2px;background:var(--ink,#1c1c1a);color:var(--bg,#f6f6f4)">NODE KEY</span><span style="font-size:11px;color:var(--ink3,#8a8982)">identifies this node</span></div>
+<sc-if value="{{ noKey }}"><span style="color:var(--ink2,#55544f)">No node key yet. Minting makes a keypair here. Only the public half is registered.</span><button onClick="{{ mint }}" style="align-self:flex-start;padding:5px 14px;border-radius:6px;border:none;background:var(--accentBg,oklch(0.5 0.13 255));color:#fff;font-weight:500;font-size:12.5px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 1px 1px rgba(0,0,0,.12)">Mint node key</button></sc-if>
+<sc-if value="{{ hasKey }}">
+<div style="font:11px/1.5 'IBM Plex Mono',monospace;word-break:break-all;color:var(--ink,#1c1c1a)">{{ keyPub }}</div>
+<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:12px"><span style="color:var(--ink3,#8a8982)">role</span><span style="font-family:'IBM Plex Mono',monospace">node</span><span style="color:var(--ink3,#8a8982)">status</span><span style="font-family:'IBM Plex Mono',monospace">{{ keyStatus }}</span><span style="color:var(--ink3,#8a8982)">valid_from</span><span style="font-family:'IBM Plex Mono',monospace">{{ keyFrom }}</span></div>
+<sc-if value="{{ registered }}"><div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span>Registered · server accepted node-key</span><span style="font:500 10px 'IBM Plex Mono',monospace;padding:1px 5px;border-radius:4px;border:1px dashed var(--ink3,#8a8982);color:var(--ink3,#8a8982)">asserted</span></div><div style="font:10.5px/1.5 'IBM Plex Mono',monospace;color:var(--ink2,#55544f);word-break:break-all">deposit_hash {{ regHash }}</div></sc-if>
+<div style="display:flex;gap:6px"><sc-if value="{{ notRegistered }}"><button onClick="{{ announce }}" style="padding:4px 12px;border-radius:6px;border:none;background:var(--accentBg,oklch(0.5 0.13 255));color:#fff;font-weight:500;font-size:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22)">Register public half</button></sc-if><button onClick="{{ rotate }}" style="padding:4px 12px;border-radius:6px;border:1px solid var(--line2,#d6d5d0);background:var(--btn,#fff);color:var(--ink,#1c1c1a);font-size:12px;box-shadow:inset 0 1px 0 var(--hi,#fff)">Rotate</button></div>
+</sc-if>
+<sc-for list="{{ oldKeys }}" as="k"><div style="display:flex;gap:8px;font:10.5px 'IBM Plex Mono',monospace;color:var(--ink3,#8a8982);border-top:1px solid var(--line,#e1e0dc);padding-top:6px"><span style="flex:1;word-break:break-all">{{ k.short }}</span><span>retired</span></div></sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px solid var(--line,#e1e0dc);border-radius:14px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.1em;padding:2px 8px;border-radius:10px;border:1px solid var(--ink2,#55544f);color:var(--ink2,#55544f)">HUMAN KEYS</span><span style="font-size:11px;color:var(--ink3,#8a8982)">yours, a separate class</span></div><span style="font-size:12px;color:var(--ink2,#55544f)">Never listed with node keys and never managed from here.</span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isConfig }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:14px;padding:8px 12px 0;border-bottom:1px solid var(--line,#e1e0dc);font-size:12.5px">
+<button onClick="{{ cfgNode }}" style="{{ cfgNodeStyle }}">node.yaml</button>
+<button onClick="{{ cfgDecl }}" style="{{ cfgDeclStyle }}">declarations.yaml <span style="color:var(--bad,oklch(0.55 0.17 27));font-weight:600">{{ expiredMark }}</span></button>
+</div>
+<sc-if value="{{ cfgIsNode }}"><div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 8px;font-size:11px;color:var(--ink3,#8a8982)"><span>path key</span><span>env var</span></div>
+<sc-for list="{{ envRows }}" as="r" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center"><span style="font:12px 'IBM Plex Mono',monospace">{{ r.k }}</span><input value="{{ r.v }}" onChange="{{ r.onChange }}" style="min-width:0;border:1px solid var(--line2,#d6d5d0);border-radius:5px;background:var(--panel,#fff);color:var(--ink,#1c1c1a);padding:4px 7px;font:12px 'IBM Plex Mono',monospace"></div></sc-for>
+<span style="font:10.5px 'IBM Plex Mono',monospace;color:var(--ink3,#8a8982)">ops/node.yaml · {{ envSaved }}</span>
+</div></sc-if>
+<sc-if value="{{ cfgIsDecl }}"><div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ declRows }}" as="d" hint-placeholder-count="3"><div style="{{ d.boxStyle }}"><div style="display:flex;justify-content:space-between;gap:8px"><span style="font:500 12px 'IBM Plex Mono',monospace">{{ d.id }}</span><span style="{{ d.stateStyle }}">{{ d.state }}</span></div><span style="color:var(--ink2,#55544f);font-size:12px">{{ d.note }}</span><sc-if value="{{ d.expired }}"><div style="display:flex;gap:5px;flex-wrap:wrap"><button onClick="{{ d.renew }}" style="padding:2px 9px;border-radius:5px;border:1px solid var(--line2,#d6d5d0);background:var(--btn,#fff);color:var(--ink,#1c1c1a);font-size:11.5px">Renew +30 days</button><button onClick="{{ d.resolve }}" style="padding:2px 9px;border-radius:5px;border:1px solid var(--line2,#d6d5d0);background:var(--btn,#fff);color:var(--ink,#1c1c1a);font-size:11.5px">Resolved</button><button onClick="{{ d.queue }}" style="padding:2px 8px;border-radius:5px;border:1px solid var(--accentLine,oklch(0.8 0.06 255));background:none;color:var(--accent,oklch(0.5 0.13 255));font-size:11.5px">{{ d.queueLabel }}</button></div></sc-if></div></sc-for>
+<button onClick="{{ addDecl }}" style="align-self:flex-start;padding:4px 12px;border-radius:6px;border:1px solid var(--line2,#d6d5d0);background:var(--btn,#fff);color:var(--ink,#1c1c1a);font-size:12px;box-shadow:inset 0 1px 0 var(--hi,#fff)">+ Add declaration</button>
+<span style="font-size:11px;color:var(--ink3,#8a8982)">Expired items re-escalate by themselves. They show up in Conform as gaps.</span>
+</div></sc-if>
+</sc-if>
+
+<sc-if value="{{ isParts }}" hint-placeholder-val="{{ false }}">
+<div style="padding:10px;display:flex;flex-direction:column;gap:2px">
+<div style="display:flex;justify-content:space-between;color:var(--ink3,#8a8982);font-size:11px;padding:0 6px 4px"><span>Component · do you have it?</span><span>Next step</span></div>
+<sc-for list="{{ partRows }}" as="p" hint-placeholder-count="7">
+<div onClick="{{ p.toggle }}" style="{{ p.rowStyle }}"><span style="{{ p.iconStyle }}">{{ p.icon }}</span><span style="flex:1">{{ p.name }} <span style="color:var(--ink3,#8a8982)">{{ p.sub }}</span></span><sc-if value="{{ p.hasNext }}"><span style="padding:2px 10px;border-radius:5px;background:var(--seg,#e9e9e6);font-size:12px;box-shadow:inset 0 1px 0 var(--hi,#fff)">{{ p.next }}</span></sc-if><sc-if value="{{ p.noNext }}"><span style="{{ p.statusStyle }}">{{ p.status }}</span></sc-if></div>
+<sc-if value="{{ p.open }}"><div style="display:flex;flex-direction:column;gap:7px;padding:10px;margin:2px 0 4px;background:var(--panel,#fff);border:1px solid var(--line2,#d6d5d0);border-radius:7px"><span style="color:var(--ink2,#55544f);font-size:12.5px">Do you already have {{ p.name }}?</span><div style="display:flex;gap:4px;flex-wrap:wrap;font-size:11.5px"><button onClick="{{ p.pickNone }}" style="{{ p.sNone }}">No → grow</button><button onClick="{{ p.pickDiff }}" style="{{ p.sDiff }}">Sort of → align</button><button onClick="{{ p.pickOne }}" style="{{ p.sOne }}">Yes → route</button><sc-if value="{{ p.optional }}"><button onClick="{{ p.pickSkip }}" style="{{ p.sSkip }}">Skip</button></sc-if></div><button onClick="{{ p.queue }}" style="align-self:flex-start;padding:2px 8px;border-radius:5px;border:1px solid var(--accentLine,oklch(0.8 0.06 255));background:none;color:var(--accent,oklch(0.5 0.13 255));font-size:11.5px">{{ p.queueLabel }}</button></div></sc-if>
+</sc-for>
+<div style="display:flex;flex-direction:column;gap:6px;padding:8px 6px;border-top:1px solid var(--line,#e1e0dc);margin-top:4px"><span>endpoint-surface <span style="color:var(--ink3,#8a8982);font-size:12px">· what this node serves</span></span><div style="display:flex;gap:14px;font:12px 'IBM Plex Mono',monospace;padding-left:4px"><sc-for list="{{ surfaceRows }}" as="e" hint-placeholder-count="3"><label style="display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" checked="{{ e.on }}" onChange="{{ e.toggle }}">{{ e.k }}</label></sc-for></div></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isConform }}" hint-placeholder-val="{{ false }}">
+<sc-if value="{{ conformNotRun }}"><div style="padding:16px 14px;display:flex;flex-direction:column;gap:10px"><span style="color:var(--ink2,#55544f)">The conformance runner checks keys, config, parts, and endpoints locally, then lists each gap with where to grow it from.</span><button onClick="{{ runConform }}" style="align-self:flex-start;padding:5px 14px;border-radius:6px;border:none;background:var(--accentBg,oklch(0.5 0.13 255));color:#fff;font-weight:500;font-size:12.5px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 1px 1px rgba(0,0,0,.12)">Run conformance</button></div></sc-if>
+<sc-if value="{{ conformRan }}">
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:1px solid var(--line,#e1e0dc);text-align:center;font-size:11.5px;color:var(--ink2,#55544f)">
+<div style="padding:8px 0;border-right:1px solid var(--line,#e1e0dc);display:flex;flex-direction:column"><b style="font-size:18px;font-weight:600;color:var(--ok,oklch(0.52 0.12 150))">{{ cGreen }}</b>green</div>
+<div style="padding:8px 0;border-right:1px solid var(--line,#e1e0dc);display:flex;flex-direction:column"><b style="font-size:18px;font-weight:600;color:var(--warn,oklch(0.6 0.13 75))">{{ cGapN }}</b>gap</div>
+<div style="padding:8px 0;display:flex;flex-direction:column"><b style="font-size:18px;font-weight:600;color:var(--ink2,#55544f)">{{ cDeclN }}</b>dated-declared</div></div>
+<div style="padding:10px;display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ cGaps }}" as="g" hint-placeholder-count="2"><div style="display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-radius:7px;border:1px solid var(--warnLine,oklch(0.82 0.08 75));background:var(--panel,#fff)"><div style="display:flex;justify-content:space-between;gap:8px"><span style="font-weight:500">{{ g.title }}</span><span style="font-size:11px;color:var(--warn,oklch(0.6 0.13 75))">gap</span></div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font:10.5px 'IBM Plex Mono',monospace;color:var(--ink2,#55544f)">{{ g.ref }}</span><button onClick="{{ g.queue }}" style="padding:1px 7px;border-radius:5px;border:1px solid var(--accentLine,oklch(0.8 0.06 255));background:none;color:var(--accent,oklch(0.5 0.13 255));font-size:11px;flex:none">{{ g.queueLabel }}</button></div></div></sc-for>
+<sc-for list="{{ cDecl }}" as="d"><div style="display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:7px;border:1px dashed var(--line2,#d6d5d0)"><span style="font:12px 'IBM Plex Mono',monospace">{{ d.id }}</span><span style="font-size:11px;color:var(--ink3,#8a8982)">declared · revisit {{ d.revisit }}</span></div></sc-for>
+<sc-if value="{{ cClean }}"><div style="padding:10px;border-radius:7px;background:var(--okBg,oklch(0.96 0.03 150));color:var(--ok,oklch(0.52 0.12 150));font-weight:500">No gaps. Everything is green or dated-declared.</div></sc-if>
+<div style="display:flex;gap:8px;align-items:center;margin-top:4px"><button onClick="{{ runConform }}" style="padding:4px 12px;border-radius:6px;border:1px solid var(--line2,#d6d5d0);background:var(--btn,#fff);color:var(--ink,#1c1c1a);font-size:12px;box-shadow:inset 0 1px 0 var(--hi,#fff)">Run again</button><span style="font:10.5px 'IBM Plex Mono',monospace;color:var(--ink3,#8a8982)">last run {{ cAt }} · local</span></div>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ isHello }}" hint-placeholder-val="{{ false }}">
+<div style="padding:12px;display:flex;flex-direction:column;gap:12px;font-size:12.5px">
+<div style="display:flex;gap:9px"><span style="{{ h1Circ }}">{{ h1Mark }}</span><div style="flex:1;display:flex;flex-direction:column;gap:5px"><div style="display:flex;justify-content:space-between;gap:6px"><span><b style="font-weight:500">Hello handshake</b> <span style="color:var(--ink2,#55544f)">· GET /api/hello</span></span><sc-if value="{{ shook }}"><span style="font:500 10px 'IBM Plex Mono',monospace;padding:1px 5px;border-radius:4px;border:1px solid var(--ink3,#8a8982);color:var(--ink2,#55544f)">✓ verified</span></sc-if></div><sc-if value="{{ shook }}"><span style="color:var(--ink2,#55544f)">Echo <span style="font-family:'IBM Plex Mono',monospace">0.3-draft</span> matches the pin. Gate is exactly {node-key, session-log}. Integrity: <b style="{{ intTextStyle }}">{{ intWord }}</b>.</span></sc-if><sc-if value="{{ notShook }}"><button onClick="{{ shake }}" style="align-self:flex-start;padding:4px 12px;border-radius:6px;border:none;background:var(--accentBg,oklch(0.5 0.13 255));color:#fff;font-weight:500;font-size:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22)">Say hello</button></sc-if></div></div>
+<div style="display:flex;gap:9px"><span style="{{ h2Circ }}">{{ h2Mark }}</span><div style="flex:1;display:flex;flex-direction:column;gap:5px"><div style="display:flex;justify-content:space-between;gap:6px"><span><b style="font-weight:500">Announce node key</b> <span style="color:var(--ink2,#55544f)">· kind node-key</span></span><sc-if value="{{ registered }}"><span style="font:500 10px 'IBM Plex Mono',monospace;padding:1px 5px;border-radius:4px;border:1px dashed var(--ink3,#8a8982);color:var(--ink3,#8a8982)">asserted</span></sc-if></div><sc-if value="{{ announceReady }}"><button onClick="{{ announce }}" style="align-self:flex-start;padding:4px 12px;border-radius:6px;border:none;background:var(--accentBg,oklch(0.5 0.13 255));color:#fff;font-weight:500;font-size:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22)">Announce</button></sc-if><sc-if value="{{ noKey }}"><span style="color:var(--ink3,#8a8982)">Mint a node key first, in Keys.</span></sc-if><sc-if value="{{ registered }}"><span style="color:var(--ink2,#55544f)">Accepted by the gate.</span></sc-if></div></div>
+<div style="display:flex;gap:9px"><span style="{{ h3Circ }}">{{ h3Mark }}</span><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px"><span><b style="font-weight:500">Emit one deposit</b> <span style="color:var(--ink2,#55544f)">· POST /api/ingest</span></span>
+<textarea value="{{ text }}" onChange="{{ onText }}" rows="3" style="resize:vertical;border:1px solid var(--line2,#d6d5d0);border-radius:6px;background:var(--panel,#fff);color:var(--ink,#1c1c1a);padding:6px 8px;font-size:12.5px"></textarea>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:11.5px;color:var(--ink2,#55544f)"><div style="display:flex;gap:8px"><sc-for list="{{ origins }}" as="o" hint-placeholder-count="3"><label style="display:flex;gap:3px;align-items:center;cursor:pointer"><input type="radio" name="origin" checked="{{ o.on }}" onChange="{{ o.pick }}">{{ o.k }}</label></sc-for></div><span style="{{ countStyle }}">{{ textLen }} / 8000</span></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button onClick="{{ emit }}" style="padding:4px 14px;border-radius:6px;border:none;background:var(--accentBg,oklch(0.5 0.13 255));color:#fff;font-weight:500;font-size:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22)">Emit</button><button onClick="{{ queueMsg }}" style="padding:3px 9px;border-radius:6px;border:1px solid var(--accentLine,oklch(0.8 0.06 255));background:none;color:var(--accent,oklch(0.5 0.13 255));font-size:11.5px">{{ queueMsgLabel }}</button><button disabled="{{ true }}" title="consent_gate_unbuilt 501" style="padding:3px 9px;border-radius:6px;border:1px dashed var(--line2,#d6d5d0);background:none;color:var(--ink2,#55544f);font-size:11.5px">Fork / remix · not yet built</button></div>
+<sc-if value="{{ hasRefusal }}"><div style="display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:6px;border:1px solid var(--bad,oklch(0.55 0.17 27));background:var(--badBg,oklch(0.96 0.02 27))"><span style="font:500 12px 'IBM Plex Mono',monospace;color:var(--bad,oklch(0.55 0.17 27))">{{ refName }}</span><span style="color:var(--ink2,#55544f);font-size:12px">{{ refMsg }}</span><span style="color:var(--ink3,#8a8982);font-size:11px">{{ refFoot }}</span></div></sc-if>
+<sc-if value="{{ hasReceipt }}"><div style="display:flex;flex-direction:column;gap:5px;padding:8px;border-radius:6px;background:var(--panel,#fff);border:1px solid var(--line,#e1e0dc)"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><span>Gate mapped text → <span style="font-family:'IBM Plex Mono',monospace">session-log</span></span><span style="font:500 10px 'IBM Plex Mono',monospace;padding:1px 5px;border-radius:4px;border:1px solid var(--ink3,#8a8982);color:var(--ink2,#55544f);flex:none">✓ checked</span></div><div style="font:10.5px/1.55 'IBM Plex Mono',monospace;color:var(--ink2,#55544f);word-break:break-all;display:flex;flex-direction:column;gap:2px"><span>payload_hash {{ rc.payload_hash }}</span><span>content_hash {{ rc.content_hash }}</span><span>deposit_hash {{ rc.deposit_hash }}</span><span>n {{ rc.n }}</span></div><span style="font-size:11px;color:var(--ink3,#8a8982)">Hashes are opaque, shown exactly as received.</span></div></sc-if>
+</div></div>
+<div style="display:flex;gap:9px"><span style="{{ h4Circ }}">{{ h4Mark }}</span><div style="flex:1;display:flex;flex-direction:column;gap:5px"><span><b style="font-weight:500">Replay proof</b> <span style="color:var(--ink2,#55544f)">· same bytes again</span></span><sc-if value="{{ replayReady }}"><button onClick="{{ replay }}" style="align-self:flex-start;padding:4px 12px;border-radius:6px;border:1px solid var(--line2,#d6d5d0);background:var(--btn,#fff);color:var(--ink,#1c1c1a);font-size:12px;box-shadow:inset 0 1px 0 var(--hi,#fff)">Replay</button></sc-if><sc-if value="{{ replayed }}"><div style="display:flex;flex-direction:column;gap:3px;font-size:12px"><div style="display:flex;justify-content:space-between"><span style="font-family:'IBM Plex Mono',monospace">duplicate: true</span><span style="font:500 10px 'IBM Plex Mono',monospace;padding:1px 5px;border-radius:4px;border:1px solid var(--ink3,#8a8982);color:var(--ink2,#55544f)">✓ verified</span></div><div style="display:flex;justify-content:space-between"><span>Receipt byte-identical to original</span><span style="font:500 10px 'IBM Plex Mono',monospace;padding:1px 5px;border-radius:4px;border:1px solid var(--ink3,#8a8982);color:var(--ink2,#55544f)">✓ verified</span></div><div style="display:flex;justify-content:space-between"><span>Log unchanged · n {{ logN }} → {{ logN }}</span><span style="font:500 10px 'IBM Plex Mono',monospace;padding:1px 5px;border-radius:4px;border:1px solid var(--ink3,#8a8982);color:var(--ink2,#55544f)">✓ verified</span></div></div></sc-if><sc-if value="{{ replayWaiting }}"><span style="color:var(--ink3,#8a8982)">After the emit: expect duplicate:true, the same receipt, and no growth.</span></sc-if></div></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isBaseline }}" hint-placeholder-val="{{ false }}">
+<sc-if value="{{ quarantined }}"><div style="padding:14px;display:flex;flex-direction:column;gap:8px"><div style="padding:10px;border-radius:7px;border:1px solid var(--bad,oklch(0.55 0.17 27));background:var(--badBg,oklch(0.96 0.02 27));display:flex;flex-direction:column;gap:3px"><span style="font:500 12px 'IBM Plex Mono',monospace;color:var(--bad,oklch(0.55 0.17 27))">503 log_integrity</span><span style="color:var(--ink2,#55544f)">Export refuses while the log is quarantined. No baseline is shown, because it wouldn't be truthful.</span></div><button onClick="{{ openIssue }}" style="align-self:flex-start;padding:4px 12px;border-radius:6px;border:1px solid var(--line2,#d6d5d0);background:var(--btn,#fff);color:var(--ink,#1c1c1a);font-size:12px">See what's quarantined</button></div></sc-if>
+<sc-if value="{{ baselineOk }}"><div style="padding:12px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span><b style="font-weight:500">GET /api/export</b> <span style="color:var(--ink2,#55544f)">· {{ logN }} entries</span></span><span style="font:10.5px 'IBM Plex Mono',monospace;color:var(--ink3,#8a8982)">seams-attribution-log/0-eom.1</span></div>
+<div style="display:flex;flex-direction:column;gap:3px;font-size:12px">
+<div style="display:flex;justify-content:space-between"><span style="font-family:'IBM Plex Mono',monospace">creator_verified: false</span><span style="color:var(--ink3,#8a8982)">on every entry, for now</span></div>
+<div style="display:flex;justify-content:space-between"><span>Hashes opaque, public sha256</span><span style="color:var(--ink3,#8a8982)">not wire-v0</span></div>
+<div style="display:flex;justify-content:space-between"><span style="font-family:'IBM Plex Mono',monospace">parents: []</span><span style="color:var(--ink3,#8a8982)">order is in the chain block</span></div></div>
+<pre style="margin:0;padding:8px;border-radius:6px;background:var(--panel,#fff);border:1px solid var(--line,#e1e0dc);font:10.5px/1.5 'IBM Plex Mono',monospace;color:var(--ink2,#55544f);white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto">{{ baselineJson }}</pre>
+<div style="display:flex;gap:6px"><button onClick="{{ saveBaseline }}" style="padding:4px 12px;border-radius:6px;border:none;background:var(--accentBg,oklch(0.5 0.13 255));color:#fff;font-weight:500;font-size:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22)">Save baseline.json</button></div>
+</div></sc-if>
+</sc-if>
+
+<sc-if value="{{ isAgent }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:2px;padding:6px 8px;border-bottom:1px solid var(--line,#e1e0dc);font-size:12px">
+<button onClick="{{ agQueue }}" style="{{ agQueueStyle }}">To hand off · {{ queueCount }}</button>
+<button onClick="{{ agSent }}" style="{{ agSentStyle }}">Handed off · {{ sentCount }}</button>
+<button onClick="{{ agRoute }}" style="{{ agRouteStyle }}">Route</button>
+</div>
+<sc-if value="{{ agIsQueue }}"><div style="padding:10px 12px;display:flex;flex-direction:column;gap:7px">
+<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink3,#8a8982)"><span>→ {{ routeLabel }}</span><span>from</span></div>
+<sc-if value="{{ queueEmpty }}"><span style="color:var(--ink2,#55544f);padding:8px 0">Nothing queued. Use <span style="color:var(--accent,oklch(0.5 0.13 255))">+ Queue</span> on any gap, problem, or message to hand it to your agent.</span></sc-if>
+<sc-for list="{{ queueRows }}" as="q" hint-placeholder-count="2"><label style="{{ q.boxStyle }}"><input type="checkbox" checked="{{ q.checked }}" onChange="{{ q.toggle }}" style="margin-top:3px"><div style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-weight:500">{{ q.title }}</span><span style="font:10.5px 'IBM Plex Mono',monospace;color:var(--ink2,#55544f);word-break:break-all">{{ q.detail }}</span></div><span style="font-size:11px;color:var(--ink3,#8a8982)">{{ q.source }}</span></label></sc-for>
+<sc-if value="{{ queueAny }}"><div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:11.5px;color:var(--ink2,#55544f)">Goal (one line, optional)</span><input value="{{ goal }}" onChange="{{ onGoal }}" placeholder="e.g. get to green before Friday" style="border:1px solid var(--line2,#d6d5d0);border-radius:5px;background:var(--panel,#fff);color:var(--ink,#1c1c1a);padding:5px 8px;font-size:12.5px"></div>
+<div style="display:flex;gap:6px;align-items:center"><button onClick="{{ handOff }}" disabled="{{ cantHandOff }}" style="padding:5px 12px;border-radius:6px;border:none;background:var(--accentBg,oklch(0.5 0.13 255));color:#fff;font-weight:500;font-size:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22)">{{ handOffLabel }}</button><button onClick="{{ copyPacket }}" disabled="{{ noneChecked }}" style="padding:4px 12px;border-radius:6px;border:1px solid var(--line2,#d6d5d0);background:var(--btn,#fff);color:var(--ink,#1c1c1a);font-size:12px">{{ copyLabel }}</button></div>
+<sc-if value="{{ routeUnset }}"><span style="font-size:11px;color:var(--warn,oklch(0.6 0.13 75))">Set a route first (Route tab).</span></sc-if>
+<details style="font-size:11.5px;color:var(--ink2,#55544f)"><summary style="cursor:pointer">Packet preview</summary><pre style="margin:6px 0 0;padding:8px;border-radius:6px;background:var(--panel,#fff);border:1px solid var(--line,#e1e0dc);font:10.5px/1.5 'IBM Plex Mono',monospace;white-space:pre-wrap;word-break:break-all">{{ packetMd }}</pre></details></sc-if>
+</div></sc-if>
+<sc-if value="{{ agIsSent }}"><div style="padding:10px 12px;display:flex;flex-direction:column;gap:7px">
+<sc-if value="{{ sentEmpty }}"><span style="color:var(--ink2,#55544f);padding:8px 0">Nothing handed off yet.</span></sc-if>
+<sc-for list="{{ sentRows }}" as="x"><div style="display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-radius:7px;border:1px solid var(--line,#e1e0dc);background:var(--panel,#fff)"><div style="display:flex;justify-content:space-between;gap:8px"><span style="font-weight:500"><span style="font-family:'IBM Plex Mono',monospace;color:var(--ink3,#8a8982)">{{ x.tid }}</span> {{ x.title }}</span></div><div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:var(--ink2,#55544f)">Written to outbox</span><span style="font:500 10px 'IBM Plex Mono',monospace;padding:1px 5px;border-radius:4px;border:1px solid var(--ink3,#8a8982);color:var(--ink2,#55544f)">✓ verified</span></div><div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:var(--ink2,#55544f)">{{ x.reply }}</span><span style="font:500 10px 'IBM Plex Mono',monospace;padding:1px 5px;border-radius:4px;border:1px dashed var(--ink3,#8a8982);color:var(--ink3,#8a8982)">asserted</span></div></div></sc-for>
+<span style="font-size:11px;color:var(--ink3,#8a8982)">Agent replies stay asserted. An item turns verified only after Conform or hello confirms the fix.</span>
+</div></sc-if>
+<sc-if value="{{ agIsRoute }}"><div style="padding:12px;display:flex;flex-direction:column;gap:9px;font-size:12.5px">
+<div style="display:flex;flex-direction:column;gap:2px"><b style="font-size:15px;font-weight:600">Where does your agent pick up work?</b><span style="color:var(--ink2,#55544f)">The launcher doesn't run your agent or talk to it. It leaves tasks where your agent looks.</span></div>
+<sc-for list="{{ routeRows }}" as="r" hint-placeholder-count="3"><label style="{{ r.boxStyle }}"><div style="display:flex;gap:7px;align-items:center"><input type="radio" name="route" checked="{{ r.on }}" onChange="{{ r.pick }}"><b style="flex:1;font-weight:500">{{ r.title }}</b><span style="{{ r.tagStyle }}">{{ r.tag }}</span></div><span style="padding-left:21px;color:var(--ink2,#55544f);font-size:12px">{{ r.desc }}</span></label></sc-for>
+<sc-if value="{{ routeIsOutbox }}"><div style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 8px;align-items:center;font-size:11.5px;color:var(--ink2,#55544f)"><span>outbox</span><input value="{{ outPath }}" onChange="{{ onOutPath }}" style="min-width:0;border:1px solid var(--line2,#d6d5d0);border-radius:5px;background:var(--panel,#fff);color:var(--ink,#1c1c1a);padding:4px 7px;font:11.5px 'IBM Plex Mono',monospace"><span>replies</span><input value="{{ replyPath }}" onChange="{{ onReplyPath }}" style="min-width:0;border:1px solid var(--line2,#d6d5d0);border-radius:5px;background:var(--panel,#fff);color:var(--ink,#1c1c1a);padding:4px 7px;font:11.5px 'IBM Plex Mono',monospace"></div>
+<details style="font-size:11.5px;color:var(--ink2,#55544f)"><summary style="cursor:pointer">Heartbeat line for your agent</summary><pre style="margin:6px 0 0;padding:8px;border-radius:6px;background:var(--panel,#fff);border:1px solid var(--line,#e1e0dc);font:10.5px/1.5 'IBM Plex Mono',monospace;white-space:pre-wrap">{{ heartbeat }}</pre></details></sc-if>
+<div style="display:flex;gap:6px"><button onClick="{{ saveRoute }}" disabled="{{ routeIsEndpoint }}" style="padding:5px 12px;border-radius:6px;border:none;background:var(--accentBg,oklch(0.5 0.13 255));color:#fff;font-weight:500;font-size:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22)">{{ saveRouteLabel }}</button></div>
+<sc-if value="{{ testShown }}"><div style="display:flex;flex-direction:column;gap:5px;padding:8px 10px;border-radius:7px;background:var(--panel,#fff);border:1px solid var(--line,#e1e0dc);font-size:12px"><div style="display:flex;justify-content:space-between"><span>Test task T-000 written</span><span style="font:500 10px 'IBM Plex Mono',monospace;padding:1px 5px;border-radius:4px;border:1px solid var(--ink3,#8a8982);color:var(--ink2,#55544f)">✓ verified</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--ink2,#55544f)">{{ testLine }}</span><sc-if value="{{ testAck }}"><span style="font:500 10px 'IBM Plex Mono',monospace;padding:1px 5px;border-radius:4px;border:1px dashed var(--ink3,#8a8982);color:var(--ink3,#8a8982)">asserted</span></sc-if></div></div></sc-if>
+</div></sc-if>
+</sc-if>
+
+</div>
+
+<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-top:1px solid var(--line,#e1e0dc);font-size:11.5px;flex:none">
+<sc-if value="{{ inSetupFlow }}" hint-placeholder-val="{{ false }}"><button onClick="{{ backToSteps }}" style="border:none;background:none;padding:0;color:var(--accent,oklch(0.5 0.13 255))">‹ All steps</button><span style="flex:1;text-align:center;color:var(--ink3,#8a8982)">setup step {{ stepNo }} of 7</span><button onClick="{{ nextStep }}" style="padding:3px 10px;border-radius:6px;border:1px solid var(--line2,#d6d5d0);background:var(--btn,#fff);color:var(--ink,#1c1c1a);box-shadow:inset 0 1px 0 var(--hi,#fff)">{{ nextLabel }}</button></sc-if>
+<sc-if value="{{ isSetup }}" hint-placeholder-val="{{ true }}"><button onClick="{{ skipToTabs }}" style="padding:3px 10px;border-radius:6px;border:1px solid var(--line2,#d6d5d0);background:var(--btn,#fff);color:var(--ink,#1c1c1a);box-shadow:inset 0 1px 0 var(--hi,#fff)">Skip to tabs</button><span style="flex:1"></span><span style="font:10.5px 'IBM Plex Mono',monospace;color:var(--ink3,#8a8982)">local only</span></sc-if>
+<sc-if value="{{ plainFooter }}" hint-placeholder-val="{{ false }}"><span style="font:10.5px 'IBM Plex Mono',monospace;color:var(--ink3,#8a8982)">local only · log n {{ logN }}</span><span style="flex:1"></span><span style="font:10.5px 'IBM Plex Mono',monospace;color:var(--ink3,#8a8982)">exposure: blocked-on-ruling</span></sc-if>
+</div>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;integrity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ok&quot;,&quot;quarantined&quot;],&quot;default&quot;:&quot;ok&quot;,&quot;tsType&quot;:&quot;'ok'|'quarantined'&quot;,&quot;section&quot;:&quot;Simulate&quot;},&quot;startInSetup&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Simulate&quot;}}">
+const TODAY = '2026-10-26';
+const PARTS = [{ id: 'identity' }, { id: 'keeper' }, { id: 'persona' }, { id: 'expert-service' }, { id: 'shared-corpus' }, { id: 'lapis-pm', optional: true }, { id: 'governance' }];
+const CH = { none: 'none', different: 'different', one: 'one-to-one', skip: 'skipped' };
+const NEXT = { none: 'Grow from seed', different: 'Align', one: 'Route' };
+const STEPS = [
+  { t: 'Rails', d: 'see what the server accepts before you send' },
+  { t: 'Keys', d: 'mint the node key that identifies this node' },
+  { t: 'Agent', d: 'where your agent picks up work' },
+  { t: 'Config', d: 'paths and accepted deviations' },
+  { t: 'Parts', d: 'what you have, what to grow' },
+  { t: 'Conform', d: 'check, see gaps' },
+  { t: 'Hello world', d: 'first deposit + baseline' }];
+const LIGHT = { '--desk': '#e4e3df', '--bg': '#f6f6f4', '--bar': '#efefec', '--panel': '#ffffff', '--seg': '#e9e9e6', '--sel': '#ffffff', '--line': '#e1e0dc', '--line2': '#d6d5d0', '--ink': '#1c1c1a', '--ink2': '#55544f', '--ink3': '#8a8982', '--btn': '#ffffff', '--hi': '#ffffff', '--accent': 'oklch(0.5 0.13 255)', '--accentBg': 'oklch(0.5 0.13 255)', '--accentLine': 'oklch(0.8 0.06 255)', '--ok': 'oklch(0.52 0.12 150)', '--okBg': 'oklch(0.96 0.03 150)', '--warn': 'oklch(0.58 0.13 75)', '--warnLine': 'oklch(0.84 0.08 75)', '--bad': 'oklch(0.55 0.17 27)', '--badBg': 'oklch(0.96 0.02 27)' };
+const DARK = { '--desk': '#0f1011', '--bg': '#1d1e20', '--bar': '#18191b', '--panel': '#25262a', '--seg': '#2a2b2e', '--sel': '#3b3c41', '--line': '#2e2f33', '--line2': '#3a3b3f', '--ink': '#e8e8e5', '--ink2': '#b4b4ae', '--ink3': '#7d7d77', '--btn': '#2f3034', '--hi': 'rgba(255,255,255,.07)', '--accent': 'oklch(0.76 0.11 255)', '--accentBg': 'oklch(0.56 0.13 255)', '--accentLine': 'oklch(0.45 0.1 255)', '--ok': 'oklch(0.74 0.12 150)', '--okBg': 'oklch(0.3 0.04 150)', '--warn': 'oklch(0.78 0.12 80)', '--warnLine': 'oklch(0.45 0.07 80)', '--bad': 'oklch(0.72 0.14 25)', '--badBg': 'oklch(0.28 0.04 27)' };
+function hx(s) { let out = ''; for (let r = 0; r < 8; r++) { let x = (0x811c9dc5 ^ Math.imul(r + 1, 2654435761)) >>> 0; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619) >>> 0; } x ^= x >>> 13; x = Math.imul(x, 0x5bd1e995) >>> 0; out += (x >>> 0).toString(16).padStart(8, '0'); } return out; }
+function addDays(d, n) { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+const nowIso = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+const hhmm = () => new Date().toTimeString().slice(0, 5);
+
+class Component extends DCLogic {
+  state = {
+    view: this.props.startInSetup === false ? 'tabs' : 'setup', tab: 'keys', mode: 'manage', agentSub: 'queue', issueOpen: false, setupFrom: null, themeOv: null,
+    nodeKey: null, oldKeys: [], registered: false, regHash: null,
+    cfgSub: 'decl', envSaved: 'saved',
+    env: [{ k: 'server_url', v: 'SEAMS_URL' }, { k: 'log_path', v: 'SEAMS_LOG' }, { k: 'registry_path', v: 'SEAMS_REGISTRY' }, { k: 'quarantine_path', v: 'SEAMS_QUARANTINE' }],
+    decls: [{ id: 'tls-off-local', note: 'TLS off on loopback while exposure is blocked-on-ruling', revisit: '2026-10-20' }, { id: 'governance-deferred', note: 'Governance layer not grown yet', revisit: '2026-11-15' }, { id: 'no-shared-corpus', note: 'Running without a shared corpus for now', revisit: '2026-12-01' }],
+    parts: { identity: 'one', keeper: 'none', persona: 'different', 'lapis-pm': 'skip' }, open: 'expert-service',
+    surface: { hello: true, emit: true, export: false },
+    conform: null,
+    shook: false, text: 'hello, network', origin: 'authored', receipt: null, refusal: null, replayed: false, logN: 41,
+    queue: [], sent: [], goal: '', route: null, routeDraft: 'outbox', outPath: 'ops/agent-queue.md', replyPath: 'ops/agent-replies.md', test: null, copied: false
+  };
+  componentWillUnmount() { clearTimeout(this.t1); clearTimeout(this.t2); }
+  addQ(title, detail, source) { this.setState(s => s.queue.some(q => q.title === title) ? null : { queue: [...s.queue, { id: title, title, detail, source, checked: true }] }); }
+  inQ(title) { return this.state.queue.some(q => q.title === title) || this.state.sent.some(q => q.title === title); }
+  qLabel(title) { return this.inQ(title) ? '✓ Queued' : '+ Queue for agent'; }
+  goStep(i) {
+    const map = ['hello', 'keys', null, 'config', 'parts', 'conform', 'hello'];
+    if (i === 2) this.setState({ view: 'tabs', mode: 'agent', agentSub: 'route', setupFrom: 2, issueOpen: false });
+    else this.setState({ view: 'tabs', mode: 'manage', tab: map[i], setupFrom: i, issueOpen: false });
+  }
+  mint = () => { const pub = 'ed25519:' + hx('k' + Date.now() + Math.random()); this.setState(s => ({ nodeKey: { pub, from: nowIso() }, registered: false, regHash: null, oldKeys: s.nodeKey ? [{ pub: s.nodeKey.pub }, ...s.oldKeys] : s.oldKeys })); };
+  announce = () => { if (!this.state.nodeKey) return; this.setState(s => ({ registered: true, regHash: hx('reg' + s.nodeKey.pub), logN: s.logN + 1 })); };
+  runConform() {
+    const s = this.state, gaps = [], decl = [];
+    let green = 0;
+    if (!s.nodeKey || !s.registered) gaps.push({ title: 'node key not registered', ref: 'grow_ref → identity/node-key' }); else green++;
+    PARTS.forEach(p => { const c = s.parts[p.id]; if (!c) { if (!p.optional) gaps.push({ title: p.id + ' not triaged', ref: 'grow_ref → triage/' + p.id }); } else if (c === 'none') gaps.push({ title: p.id + ' missing', ref: 'grow_ref → seeds/' + p.id }); else green++; });
+    Object.entries(s.surface).forEach(([k, v]) => { if (v) green++; else gaps.push({ title: k + ' endpoint absent', ref: 'grow_ref → surface/' + k }); });
+    s.decls.forEach(d => { if (d.revisit < TODAY) gaps.push({ title: 'declaration expired: ' + d.id, ref: 're-escalated · ops/declarations.yaml' }); else decl.push(d); });
+    this.setState({ conform: { at: hhmm(), green, gaps, decl } });
+  }
+  emit = () => {
+    const s = this.state, q = (this.props.integrity ?? 'ok') === 'quarantined', t = s.text;
+    const hold = (m) => this.setState({ refusal: { name: 'held by launcher', msg: m, foot: 'Not a server refusal. Nothing was sent.' } });
+    if (q) return hold('The log is quarantined. The launcher won\u2019t send into a corrupted log.');
+    if (!s.shook) return hold('Say hello first, so the wire and gate are confirmed before sending.');
+    const ref = (name, msg) => this.setState({ refusal: { name, msg, foot: 'Refusals don\u2019t count against your rate budget.' } });
+    if (!t.trim()) return ref('empty 400', 'Nothing to deposit.');
+    if (/^\s*---\s*\n/.test(t) || /^\s*kind\s*:/im.test(t)) return ref('unknown_kind 400', 'Text with a header shape is refused, never defaulted.');
+    if (t.length > 8000) return ref('too_long 413', 'Over 8000 characters.');
+    const payload_hash = hx('p|' + s.origin + '|' + t);
+    if (s.receipt && s.receipt.payload_hash === payload_hash) return this.replay();
+    this.setState({ refusal: null, replayed: false, logN: s.logN + 1, receipt: { payload_hash, content_hash: hx('c|' + t), deposit_hash: hx('d|' + t + (s.nodeKey ? s.nodeKey.pub : '')), n: s.logN + 1, ts: nowIso(), origin: s.origin } });
+  };
+  replay = () => { if (this.state.receipt) this.setState({ replayed: true, refusal: null }); };
+  packet(items) {
+    const base = this.state.sent.length;
+    return '# seams tasks\n\ngoal: ' + (this.state.goal || '—') + '\n\n' + items.map((q, i) => '## T-' + String(base + i + 1).padStart(3, '0') + ' ' + q.title + '\n- source: ' + q.source + '\n- evidence: ' + q.detail + '\n- status: open').join('\n\n') + '\n';
+  }
+  renderVals() {
+    const s = this.state, P = this.props;
+    const theme = s.themeOv ?? P.theme ?? 'light';
+    const quarantined = (P.integrity ?? 'ok') === 'quarantined';
+    const expired = s.decls.filter(d => d.revisit < TODAY);
+    const triaged = PARTS.filter(p => s.parts[p.id]).length;
+    const done = [true, !!s.nodeKey && s.registered, !!s.route, expired.length === 0, triaged === PARTS.length, !!s.conform, s.replayed];
+    const cur = done.indexOf(false);
+    const view = s.view, isSetup = view === 'setup', isTabs = view === 'tabs';
+    const manage = isTabs && s.mode === 'manage' && !s.issueOpen;
+    const tab = s.tab;
+    const seg = (on) => ({ padding: '1px 9px', borderRadius: 4, border: 'none', background: on ? 'var(--sel)' : 'transparent', color: on ? 'var(--ink)' : 'var(--ink2)', boxShadow: on ? 'inset 0 1px 0 var(--hi), 0 1px 1px rgba(0,0,0,.08)' : 'none', fontSize: 11.5 });
+    const pill = (on) => ({ flex: 1, padding: '4px 0', borderRadius: 5, border: 'none', background: on ? 'var(--sel)' : 'transparent', color: on ? 'var(--ink)' : 'var(--ink2)', fontWeight: on ? 500 : 400, boxShadow: on ? 'inset 0 1px 0 var(--hi), 0 1px 1px rgba(0,0,0,.08)' : 'none', fontSize: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.25 });
+    const under = (on) => ({ border: 'none', background: 'none', padding: '0 0 6px', color: on ? 'var(--ink)' : 'var(--ink2)', fontWeight: on ? 500 : 400, borderBottom: on ? '2px solid var(--ink)' : '2px solid transparent', fontSize: 12.5 });
+    const cGaps = s.conform ? s.conform.gaps.length : 0;
+    const badge = (t, c) => ({ t, c });
+    const badges = {
+      keys: s.registered ? badge('✓', 'var(--ok)') : s.nodeKey ? badge('unreg', 'var(--warn)') : badge('none', 'var(--warn)'),
+      config: expired.length ? badge('! ' + expired.length, 'var(--bad)') : badge('✓', 'var(--ok)'),
+      parts: badge(triaged + '/' + PARTS.length, triaged === PARTS.length ? 'var(--ok)' : 'var(--ink3)'),
+      conform: s.conform ? (cGaps ? badge(cGaps + ' gap', 'var(--warn)') : badge('green', 'var(--ok)')) : badge('—', 'var(--ink3)'),
+      hello: quarantined ? badge('paused', 'var(--bad)') : s.replayed ? badge('✓', 'var(--ok)') : badge('—', 'var(--ink3)'),
+      baseline: quarantined ? badge('503', 'var(--bad)') : badge(String(s.logN), 'var(--ink3)')
+    };
+    const tabs = [['keys', 'Keys'], ['config', 'Config'], ['parts', 'Parts'], ['conform', 'Conform'], ['hello', 'Hello'], ['baseline', 'Baseline']].map(([id, label]) => ({
+      label, badge: badges[id].t, style: pill(tab === id), badgeStyle: { fontSize: 10, color: tab === id && badges[id].c === 'var(--ink3)' ? 'var(--ink2)' : badges[id].c, fontWeight: 600 },
+      go: () => this.setState({ tab: id, setupFrom: s.setupFrom !== null && STEPS[s.setupFrom] && ['hello', 'keys', null, 'config', 'parts', 'conform', 'hello'][s.setupFrom] === id ? s.setupFrom : null })
+    }));
+    const steps = STEPS.map((st, i) => {
+      const d = done[i], c = i === cur;
+      return {
+        title: st.t, desc: st.d, current: c, mark: d ? '✓' : String(i + 1), hint: d ? 'done' : c ? '' : 'open ›', go: () => this.goStep(i),
+        rowStyle: { display: 'flex', gap: 10, padding: c ? '10px 8px' : '8px 6px', alignItems: c ? 'flex-start' : 'center', background: c ? 'var(--panel)' : 'transparent', border: c ? '1px solid var(--line2)' : '1px solid transparent', borderRadius: 7, cursor: 'pointer' },
+        circStyle: { width: 18, height: 18, borderRadius: '50%', flex: 'none', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', background: d ? 'var(--ok)' : c ? 'var(--accentBg)' : 'transparent', color: d || c ? '#fff' : 'var(--ink3)', border: d || c ? 'none' : '1px solid var(--line2)' },
+        textStyle: { color: c || d ? 'var(--ink2)' : 'var(--ink3)' }
+      };
+    });
+    const circ = (st) => ({ width: 18, height: 18, borderRadius: '50%', flex: 'none', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', background: st === 'done' ? 'var(--ok)' : st === 'cur' ? 'var(--accentBg)' : 'transparent', color: st === 'todo' ? 'var(--ink3)' : '#fff', border: st === 'todo' ? '1px solid var(--line2)' : 'none' });
+    const hs = [s.shook, s.registered, !!s.receipt, s.replayed];
+    const hcur = hs.indexOf(false);
+    const hst = (i) => hs[i] ? 'done' : i === hcur ? 'cur' : 'todo';
+    const partRows = PARTS.map(p => {
+      const c = s.parts[p.id], open = s.open === p.id;
+      const dec = p.id === 'governance' ? s.decls.find(d => d.id === 'governance-deferred' && d.revisit >= TODAY) : null;
+      const opt = (k) => ({ padding: '2px 8px', borderRadius: 5, border: c === k ? '1px solid var(--accentBg)' : '1px solid var(--line2)', background: c === k ? 'var(--accentBg)' : 'var(--btn)', color: c === k ? '#fff' : 'var(--ink)', boxShadow: 'inset 0 1px 0 var(--hi)' });
+      const pick = (k) => (e) => { e.stopPropagation(); this.setState(st => ({ parts: { ...st.parts, [p.id]: k }, open: null })); };
+      const title = (c ? 'revisit ' : 'triage ') + p.id;
+      return {
+        name: p.id, optional: !!p.optional, open,
+        sub: c ? '· ' + CH[c] : p.optional ? '· optional' : '',
+        icon: c ? (c === 'skip' ? '–' : '✓') : '○',
+        iconStyle: { width: 12, color: c && c !== 'skip' ? 'var(--ok)' : 'var(--ink3)' },
+        hasNext: !!NEXT[c], noNext: !NEXT[c], next: NEXT[c] || '',
+        status: c === 'skip' ? 'skipped' : dec ? 'declared · revisit ' + dec.revisit.slice(5) : 'not triaged',
+        statusStyle: { fontSize: 11.5, color: c === 'skip' || dec ? 'var(--ink3)' : 'var(--warn)' },
+        rowStyle: { display: 'flex', alignItems: 'center', gap: 9, padding: 6, borderBottom: open ? '1px solid transparent' : '1px solid var(--line)', cursor: 'pointer', color: c === 'skip' ? 'var(--ink3)' : 'var(--ink)', borderRadius: 4, background: open ? 'var(--seg)' : 'transparent' },
+        toggle: () => this.setState(st => ({ open: st.open === p.id ? null : p.id })),
+        pickNone: pick('none'), pickDiff: pick('different'), pickOne: pick('one'), pickSkip: pick('skip'),
+        sNone: opt('none'), sDiff: opt('different'), sOne: opt('one'), sSkip: opt('skip'),
+        queueLabel: this.qLabel(title), queue: (e) => { e.stopPropagation(); this.addQ(title, c ? 'current: ' + CH[c] + ' · confirm or change' : 'none / different / one-to-one ?', 'Parts'); }
+      };
+    });
+    const declRows = s.decls.map(d => {
+      const ex = d.revisit < TODAY, title = 'resolve declaration ' + d.id;
+      return {
+        id: d.id, note: d.note, expired: ex, state: ex ? 'expired ' + d.revisit + ' · re-escalated' : 'revisit ' + d.revisit,
+        stateStyle: { fontSize: 11, color: ex ? 'var(--bad)' : 'var(--ink3)', fontWeight: ex ? 600 : 400, textAlign: 'right' },
+        boxStyle: { display: 'flex', flexDirection: 'column', gap: 5, padding: '8px 10px', borderRadius: 7, border: ex ? '1px solid var(--bad)' : '1px dashed var(--line2)', background: ex ? 'var(--badBg)' : 'transparent' },
+        renew: () => this.setState(st => ({ decls: st.decls.map(x => x.id === d.id ? { ...x, revisit: addDays(TODAY, 30) } : x) })),
+        resolve: () => this.setState(st => ({ decls: st.decls.filter(x => x.id !== d.id) })),
+        queueLabel: this.qLabel(title), queue: () => this.addQ(title, 'expired ' + d.revisit + ' · ' + d.note, 'Config')
+      };
+    });
+    const cg = s.conform ? s.conform.gaps.map(g => ({ ...g, queueLabel: this.inQ(g.title) ? '✓ Queued' : '+ Queue', queue: () => this.addQ(g.title, g.ref, 'Conform') })) : [];
+    const checked = s.queue.filter(q => q.checked);
+    const msgTitle = 'send: "' + (s.text.length > 28 ? s.text.slice(0, 28) + '…' : s.text) + '"';
+    const routeRows = [
+      { id: 'outbox', title: 'Outbox file', tag: 'works with any agent', desc: 'The launcher writes a markdown file. Point your agent\u2019s heartbeat at it.', tc: 'var(--ok)' },
+      { id: 'endpoint', title: 'Endpoint', tag: 'not built · open question', desc: 'POST the packet to a URL you supply (OpenAI-compatible, Anthropic, local).', tc: 'var(--warn)' },
+      { id: 'copy', title: 'Copy only', tag: '', desc: 'You paste the packet into your agent yourself.', tc: 'var(--ink3)' }
+    ].map(r => ({ ...r, on: s.routeDraft === r.id, pick: () => this.setState({ routeDraft: r.id }), tagStyle: { fontSize: 11, color: r.tc }, boxStyle: { display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 10px', borderRadius: 7, border: s.routeDraft === r.id ? '1px solid var(--accentBg)' : '1px solid var(--line2)', background: s.routeDraft === r.id ? 'var(--panel)' : 'transparent', cursor: 'pointer', opacity: r.id === 'endpoint' ? 0.75 : 1 } }));
+    const lastEntry = s.receipt ? { op: 'deposit', kind: 'session-log', v: 'seams-wire/0.3-draft', ts: s.receipt.ts, content_hash: s.receipt.content_hash, deposit_hash: s.receipt.deposit_hash, parents: [], derivation: null, creator_ref: s.nodeKey ? 'node:' + s.nodeKey.pub : null, creator_verified: false, provenance: s.receipt.origin, use_terms: null } : null;
+    const baselineObj = { format: 'seams-attribution-log/0-eom.1', wire: 'seams-wire/0.3-draft', n: s.logN, last_entry: lastEntry, chain: lastEntry ? { n: s.receipt.n, prev: hx('prev' + (s.receipt.n - 1)), hash: hx('chain' + s.receipt.n) } : null };
+    const stepNo = s.setupFrom !== null ? s.setupFrom + 1 : 0;
+    const sentRows = s.sent.map(x => ({ ...x, reply: x.reply || 'Waiting for a reply in ' + s.replyPath.split('/').pop() }));
+    const handOffLabel = s.route === 'copy' ? 'Copy ' + checked.length + ' task' + (checked.length === 1 ? '' : 's') : 'Write ' + checked.length + ' task' + (checked.length === 1 ? '' : 's') + ' to outbox';
+    return {
+      themeVars: theme === 'dark' ? DARK : LIGHT,
+      isSetup, isTabs, quarantined, baselineOk: !quarantined,
+      showQBanner: quarantined && isTabs && !s.issueOpen,
+      showTabBar: manage, showIssue: isTabs && s.issueOpen,
+      isKeys: manage && tab === 'keys', isConfig: manage && tab === 'config', isParts: manage && tab === 'parts', isConform: manage && tab === 'conform', isHello: manage && tab === 'hello', isBaseline: manage && tab === 'baseline',
+      isAgent: isTabs && s.mode === 'agent' && !s.issueOpen,
+      segManage: seg(s.mode === 'manage'), segAgent: seg(s.mode === 'agent'),
+      toManage: () => this.setState({ mode: 'manage', issueOpen: false }), toAgent: () => this.setState({ mode: 'agent', issueOpen: false, setupFrom: null }),
+      queueCount: s.queue.length, sentCount: s.sent.length, doneCount: done.filter(Boolean).length,
+      openGuide: () => this.setState({ view: 'setup', setupFrom: null, issueOpen: false }),
+      toggleTheme: () => this.setState({ themeOv: theme === 'dark' ? 'light' : 'dark' }),
+      integrityLabel: quarantined ? 'QUARANTINED ›' : 'integrity ok',
+      integrityStyle: { marginLeft: 'auto', whiteSpace: 'nowrap', border: 'none', background: 'none', padding: 0, font: "inherit", color: quarantined ? 'var(--bad)' : 'var(--ok)', fontWeight: quarantined ? 600 : 400, cursor: quarantined ? 'pointer' : 'default' },
+      openIssue: () => { if (quarantined) this.setState({ view: 'tabs', issueOpen: true }); },
+      closeIssue: () => this.setState({ issueOpen: false }),
+      repairLabel: this.inQ('repair quarantined log') ? '✓ Queued "repair log"' : '+ Queue "repair log"',
+      queueRepair: () => this.addQ('repair quarantined log', 'quarantine.jsonl lines 37–38 · 503 log_integrity · chain ok to n=36', 'Integrity'),
+      tabs, steps,
+      inSetupFlow: isTabs && s.setupFrom !== null && !s.issueOpen, stepNo,
+      nextLabel: s.setupFrom === 6 ? 'Finish' : 'Next step ›',
+      nextStep: () => { if (s.setupFrom >= 6) this.setState({ view: 'setup', setupFrom: null }); else this.goStep(s.setupFrom + 1); },
+      backToSteps: () => this.setState({ view: 'setup', setupFrom: null }),
+      skipToTabs: () => this.setState({ view: 'tabs', setupFrom: null }),
+      plainFooter: isTabs && (s.setupFrom === null || s.issueOpen),
+      // keys
+      noKey: !s.nodeKey, hasKey: !!s.nodeKey, keyPub: s.nodeKey ? s.nodeKey.pub : '', keyFrom: s.nodeKey ? s.nodeKey.from : '', keyStatus: s.registered ? 'active' : 'active · not registered yet',
+      registered: s.registered, notRegistered: !!s.nodeKey && !s.registered, regHash: s.regHash || '',
+      oldKeys: s.oldKeys.map(k => ({ short: k.pub })),
+      mint: this.mint, rotate: this.mint, announce: this.announce,
+      // config
+      cfgIsNode: s.cfgSub === 'node', cfgIsDecl: s.cfgSub === 'decl', cfgNode: () => this.setState({ cfgSub: 'node' }), cfgDecl: () => this.setState({ cfgSub: 'decl' }),
+      cfgNodeStyle: under(s.cfgSub === 'node'), cfgDeclStyle: under(s.cfgSub === 'decl'), expiredMark: expired.length ? '!' : '',
+      envRows: s.env.map((r, i) => ({ ...r, onChange: (e) => { const v = e.target.value; this.setState(st => ({ envSaved: 'saved ' + hhmm(), env: st.env.map((x, j) => j === i ? { ...x, v } : x) })); } })),
+      envSaved: s.envSaved, declRows,
+      addDecl: () => this.setState(st => ({ decls: [...st.decls, { id: 'deviation-' + (st.decls.length + 1), note: 'Describe the accepted deviation', revisit: addDays(TODAY, 30) }] })),
+      // parts
+      partRows, surfaceRows: Object.entries(s.surface).map(([k, on]) => ({ k, on, toggle: () => this.setState(st => ({ surface: { ...st.surface, [k]: !st.surface[k] } })) })),
+      // conform
+      conformRan: !!s.conform, conformNotRun: !s.conform, runConform: () => this.runConform(),
+      cGreen: s.conform ? s.conform.green : 0, cGapN: cGaps, cDeclN: s.conform ? s.conform.decl.length : 0, cGaps: cg, cDecl: s.conform ? s.conform.decl : [], cClean: !!s.conform && cGaps === 0, cAt: s.conform ? s.conform.at : '',
+      // hello
+      shook: s.shook, notShook: !s.shook, shake: () => this.setState({ shook: true }),
+      intWord: quarantined ? 'QUARANTINED' : 'ok', intTextStyle: { fontWeight: 600, color: quarantined ? 'var(--bad)' : 'var(--ok)' },
+      announceReady: !!s.nodeKey && !s.registered,
+      h1Circ: circ(hst(0)), h2Circ: circ(hst(1)), h3Circ: circ(hst(2)), h4Circ: circ(hst(3)),
+      h1Mark: hs[0] ? '✓' : '1', h2Mark: hs[1] ? '✓' : '2', h3Mark: hs[2] ? '✓' : '3', h4Mark: hs[3] ? '✓' : '4',
+      text: s.text, onText: (e) => this.setState({ text: e.target.value, refusal: null }), textLen: s.text.length,
+      countStyle: { fontFamily: "'IBM Plex Mono',monospace", color: s.text.length > 8000 ? 'var(--bad)' : 'var(--ink3)' },
+      origins: ['authored', 'assisted', 'played'].map(k => ({ k, on: s.origin === k, pick: () => this.setState({ origin: k }) })),
+      emit: this.emit, replay: this.replay,
+      queueMsgLabel: this.inQ(msgTitle) ? '✓ Queued' : '+ Queue for agent',
+      queueMsg: () => this.addQ(msgTitle, 'message · origin ' + s.origin + ' · ' + s.text.length + ' chars', 'Hello'),
+      hasRefusal: !!s.refusal, refName: s.refusal ? s.refusal.name : '', refMsg: s.refusal ? s.refusal.msg : '', refFoot: s.refusal ? s.refusal.foot : '',
+      hasReceipt: !!s.receipt, rc: s.receipt || {},
+      replayReady: !!s.receipt && !s.replayed, replayed: s.replayed, replayWaiting: !s.receipt, logN: s.logN,
+      // baseline
+      baselineJson: JSON.stringify(baselineObj, null, 2),
+      saveBaseline: () => { const b = new Blob([JSON.stringify(baselineObj, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'baseline.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); },
+      // agent
+      agQueue: () => this.setState({ agentSub: 'queue' }), agSent: () => this.setState({ agentSub: 'sent' }), agRoute: () => this.setState({ agentSub: 'route' }),
+      agQueueStyle: { ...pill(s.agentSub === 'queue'), flexDirection: 'row', justifyContent: 'center' }, agSentStyle: { ...pill(s.agentSub === 'sent'), flexDirection: 'row', justifyContent: 'center' }, agRouteStyle: { ...pill(s.agentSub === 'route'), flexDirection: 'row', justifyContent: 'center' },
+      agIsQueue: s.agentSub === 'queue', agIsSent: s.agentSub === 'sent', agIsRoute: s.agentSub === 'route',
+      routeLabel: s.route === 'outbox' ? s.outPath : s.route === 'copy' ? 'clipboard (copy only)' : 'no route set',
+      queueEmpty: !s.queue.length, queueAny: !!s.queue.length,
+      queueRows: s.queue.map(q => ({ ...q, toggle: () => this.setState(st => ({ queue: st.queue.map(x => x.id === q.id ? { ...x, checked: !x.checked } : x) })), boxStyle: { display: 'flex', gap: 8, alignItems: 'flex-start', padding: '8px 10px', borderRadius: 7, border: '1px solid ' + (q.source === 'Integrity' ? 'var(--bad)' : q.source === 'Conform' || q.source === 'Config' ? 'var(--warnLine)' : 'var(--line2)'), background: 'var(--panel)', cursor: 'pointer', opacity: q.checked ? 1 : 0.6 } })),
+      goal: s.goal, onGoal: (e) => this.setState({ goal: e.target.value }),
+      routeUnset: !s.route, cantHandOff: !s.route || !checked.length, noneChecked: !checked.length, handOffLabel,
+      copyLabel: s.copied ? 'Copied' : 'Copy',
+      packetMd: this.packet(checked),
+      handOff: () => {
+        const md = this.packet(checked); if (s.route === 'copy') navigator.clipboard?.writeText(md).catch(() => { });
+        const base = s.sent.length;
+        this.setState(st => ({ sent: [...st.sent, ...checked.map((q, i) => ({ ...q, tid: 'T-' + String(base + i + 1).padStart(3, '0') }))], queue: st.queue.filter(q => !q.checked), agentSub: 'sent' }));
+      },
+      copyPacket: () => { navigator.clipboard?.writeText(this.packet(checked)).catch(() => { }); this.setState({ copied: true }); clearTimeout(this.t2); this.t2 = setTimeout(() => this.setState({ copied: false }), 1500); },
+      sentEmpty: !s.sent.length, sentRows,
+      routeRows, routeIsOutbox: s.routeDraft === 'outbox', routeIsEndpoint: s.routeDraft === 'endpoint',
+      outPath: s.outPath, replyPath: s.replyPath, onOutPath: (e) => this.setState({ outPath: e.target.value }), onReplyPath: (e) => this.setState({ replyPath: e.target.value }),
+      heartbeat: 'Every 30 min: read ' + s.outPath + '. Work any task with status: open. Append "ack T-xxx" or a short result to ' + s.replyPath + '. Don\u2019t edit the outbox.',
+      saveRouteLabel: s.routeDraft === 'outbox' ? 'Save + write test task' : s.routeDraft === 'copy' ? 'Use copy only' : 'Not available yet',
+      saveRoute: () => {
+        if (s.routeDraft === 'endpoint') return;
+        this.setState({ route: s.routeDraft, test: s.routeDraft === 'outbox' ? 'waiting' : null });
+        if (s.routeDraft === 'outbox') { clearTimeout(this.t1); this.t1 = setTimeout(() => this.setState({ test: 'ack' }), 2500); }
+      },
+      testShown: !!s.test, testAck: s.test === 'ack',
+      testLine: s.test === 'ack' ? 'Agent replied "ack T-000"' : 'Waiting for a reply in ' + s.replyPath.split('/').pop() + '…'
+    };
+  }
+}
+</script>
+</body>
+</html>

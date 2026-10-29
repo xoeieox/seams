@@ -1,0 +1,69 @@
+# cloudflared tunnel config - TEMPLATE ONLY (go-public prep 2026-10-28).
+# ──────────────────────────────────────────────────────────────────────────
+# This file is committed DE-CREDS and NEVER run as-is. Placeholders in <ANGLE_BRACKETS> are
+# filled at the cutover session on BRIX (never committed): the tunnel UUID from
+# `cloudflared tunnel create`, credentials JSON kept OUT OF TREE at ~/.cloudflared/ (0600),
+# and the tunnel name. `tunnel run` is HARD-STOPPED until Erah's GO - see the cutover
+# command list in the go-public report; nothing in this repo executes it.
+#
+# F1 (keeper CRITICAL, 2026-10-28): the public origin is the DEDICATED loopback port, FULL URL,
+# named in every ingress line - never a bare port, never 8080 (that port belongs to a
+# docker-proxy/qBittorrent on this host's interface address). The catch-all 404 is the LAST
+# rule: no path exists outside the listed routes.
+# F4: the node itself still binds loopback only (BIND_HOST 127.0.0.1 default; non-loopback
+# refuses to boot without the named escape hatch). The connector attracts the public side.
+# No reverse proxy in front of or behind the connector; forwarded headers stay unread.
+
+tunnel: <TUNNEL-UUID>
+credentials-file: /home/OPERATOR/.cloudflared/<TUNNEL-UUID>.json   # 0600, out-of-tree, never committed
+
+ingress:
+  # the protocol surface (the ONLY public routes; both answer from the node-one origin)
+  - hostname: seams.fyi
+    path: ^/api/hello$
+    service: http://127.0.0.1:18080
+  - hostname: seams.fyi
+    path: ^/api/export$
+    service: http://127.0.0.1:18080
+  - hostname: seams.fyi
+    path: ^/api/ingest$
+    service: http://127.0.0.1:18080   # the single write entry (op: hello/emit/...); send-hello posts here
+  # the protocol landing page, served BY the node at / (honest IS/IS-NOT list; see README)
+  - hostname: seams.fyi
+    path: ^/$
+    service: http://127.0.0.1:18080
+  - hostname: seams.fyi
+    path: ^/landing\.js$
+    service: http://127.0.0.1:18080
+  # the editor demo moved to /text (landing page links it) - static assets served by node-one
+  - hostname: seams.fyi
+    path: ^/text$
+    service: http://127.0.0.1:18080
+  - hostname: seams.fyi
+    path: ^/index\.html$
+    service: http://127.0.0.1:18080
+  - hostname: seams.fyi
+    path: ^/app\.js$
+    service: http://127.0.0.1:18080
+  - hostname: seams.fyi
+    path: ^/app\.css$
+    service: http://127.0.0.1:18080
+  # the human emit page
+  - hostname: seams.fyi
+    path: ^/emit$
+    service: http://127.0.0.1:18080
+  - hostname: seams.fyi
+    path: ^/emit\.html$
+    service: http://127.0.0.1:18080
+  # CATCH-ALL: everything else 404s at the edge, deliberately - "no path exists outside the
+  # listed routes" is a property of the config, not a hope. admin routes (/#/admin is a client
+  # hash route over /text and never a server path; /api/admin/* stays loopback-ONLY - it is
+  # absent from this list, so the tunnel cannot reach it even by path guessing).
+  - hostname: seams.fyi
+    service: http://127.0.0.1:404        # nothing listens here -> cloudflared answers 404
+  # no hostname-less catch-all `service:` line: unknown hostnames die at Cloudflare's edge.
+
+# After the file exists: cloudflared tunnel route ip +ddns ... is NOT used; DNS routing for the
+# delegated zone (nameservers lily.ns.cloudflare.com / mustafa.ns.cloudflare.com, verified via
+# RDAP 2026-10-26) is `cloudflared tunnel route dns <tunnel> seams.fyi` - CUTOVER, not prep.
+# Post-cut, EVERY time: eom/endpoint-surface/cloudflared/verify-tunnel-fingerprint.sh

@@ -1,0 +1,14 @@
+{
+  "note": "v2-era payloads (0-eom.2): versions carry kind/stats/restored_v; the export carries ingest deposits, one signature-checked, one typed claim. Fixture data.",
+  "versions": [
+    { "v": 1, "ts": "2026-10-28T10:00:00.000Z", "name": "Erah", "kind": "seed", "stats": { "added_words": 100, "removed_words": 0 } },
+    { "v": 2, "ts": "2026-10-28T10:30:00.000Z", "name": "Sam", "kind": "edit", "stats": { "added_words": 20, "removed_words": 5 } },
+    { "v": 4, "ts": "2026-10-28T12:00:00.000Z", "name": "admin", "kind": "revert", "restored_v": 1, "stats": { "added_words": 1, "removed_words": 3 } }
+  ],
+  "entries": [
+    { "v": 1, "ts": "2026-10-28T10:00:00.000Z", "creator_ref": "name:Erah", "provenance": { "entry_kind": "seed" }, "derivation": "original", "parents": [] },
+    { "v": 3, "ts": "2026-10-28T11:00:00.000Z", "creator_ref": "key:ed25519:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "creator_verified": true, "provenance": { "entry_kind": "ingest", "via": "ingest" }, "derivation": "original", "parents": [] },
+    { "v": 5, "ts": "2026-10-28T13:00:00.000Z", "creator_ref": "key:ed25519:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=", "creator_verified": false, "provenance": { "entry_kind": "ingest", "via": "ingest" }, "derivation": "original", "parents": [] },
+    { "v": 6, "ts": "2026-10-28T14:00:00.000Z", "creator_ref": "name:Visitor", "creator_verified": false, "provenance": { "entry_kind": "ingest", "via": "ingest" }, "derivation": "original", "parents": [] }
+  ]
+}
