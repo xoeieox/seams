@@ -24,7 +24,7 @@ Open **http://127.0.0.1:4173/** — or install it as an app (see
 *“already running — open the URL”*, never an `EADDRINUSE` stack trace. Knobs (all
 optional): `PORT` (4173) · `NODE_ONE_PORT` (8080) · `OPS_DIR` · `NODE_ONE_DATA_DIR` ·
 `NODE_ONE_URL` (expert: proxy to an already-running loopback node-one instead of spawning
-one). On a remote box, port-forward first: `ssh -L 4173:127.0.0.1:4173 <user>@<launcher-box>`.
+one) · `SEAMS_GATEWAY_URL` (optional bare https origin of a public demo gateway: opens `/gateway/*` send routes; see `docs/DEMO-REHEARSAL.md`). On a remote box, port-forward first: `ssh -L 4173:127.0.0.1:4173 <user>@<launcher-box>`.
 
 The two servers can still be run separately:
 

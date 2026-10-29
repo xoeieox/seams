@@ -59,3 +59,7 @@ If you can read a file on this machine, you know what to do and do it — withou
   sidecar speak.
 - **Red gates are the answer.** If a gate (`npm test`, pytest scrub, MANIFEST) is red, paste it;
   do not skip, delete, or work around a gate.
+
+## Where this packet lives
+
+Packet home: `github.com/xoeieox/seams` (public push pending; until it exists, treat the unpacked tree you were given as the source). The launcher bundle name and sha to fetch are recorded by the owner, not here.

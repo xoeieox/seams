@@ -303,6 +303,55 @@ export function parseReplies(text) {
   }
   return rows;
 }
+// W2 (EOM-E2E-BATTLE-2026-10-29): the reply watcher is real. It reads agent-replies.md from a
+// PERSISTED cursor {offset, prefix_sha} (byte offset + hash of every byte before it), so a restart
+// resumes exactly where it stopped: replies appended during the gap come back once, nothing already
+// delivered comes back again. Only COMPLETE lines (newline-terminated) are consumed, so a half-written
+// ack is left for the next poll instead of being parsed short. If the bytes before the cursor changed
+// (file truncated, rotated or rewritten) the prefix hash no longer matches: the watcher reports
+// reset:true and re-reads from 0 - never silently skips and never trusts a stale offset.
+// `hash` is injected (node:crypto lives server-side; this module is also served to the browser).
+// Every entry stays honesty:'asserted' (parseReplies pins it): a line in a file never verifies work.
+export function watchReplies(text, cursor, hash) {
+  const buf = new TextEncoder().encode(String(text ?? ''));
+  let off = 0; let reset = false;
+  const want = cursor && Number.isInteger(cursor.offset) && cursor.offset > 0 ? cursor : null;
+  if (want) {
+    if (want.offset <= buf.length && hash(buf.subarray(0, want.offset)) === want.prefix_sha) off = want.offset; else reset = true;
+  }
+  const tail = buf.subarray(off);
+  const nl = tail.lastIndexOf(10);
+  const used = nl < 0 ? 0 : nl + 1;
+  const end = off + used;
+  const entries = parseReplies(new TextDecoder().decode(tail.subarray(0, used)));
+  return { entries, cursor: { offset: end, prefix_sha: hash(buf.subarray(0, end)) }, reset, pending_partial: tail.length - used };
+}
+
+// W3 (EOM-E2E-BATTLE-2026-10-29): the consent envelope. SHAPE CONTRACT ONLY. The deposits-spec ruling
+// (what a work hash IS, what a consent record binds) is still open, so `work` is an opaque
+// sha256:<64 hex> placeholder exactly like every other hash in this surface, and nothing here claims
+// the gateway will accept it: the launcher builds, validates and signs the envelope and sends it
+// through the same wire-pinned posture as emit; the node answers (today: consent_gate_unbuilt 501) and
+// that answer is shown verbatim. The grant vocabulary is the one node-one already advertises in
+// use_terms.allowed_uses - no new term is invented.
+export const CONSENT_GRANTS = ['view', 'fork', 'remix'];
+export function buildConsent(input) {
+  const b = input && typeof input === 'object' && !Array.isArray(input) ? input : null;
+  if (!b) return { error: 'bad_body', message: 'body must be a consent object.' };
+  const allowed = new Set(['op', 'node_key', 'work', 'grants', 'note', 'sig']);
+  const extra = Object.keys(b).filter((k) => !allowed.has(k));
+  if (extra.length) return { error: 'bad_request', message: 'unknown fields refused: ' + extra.sort().join(', ') };
+  if (b.op !== 'consent') return { error: 'unknown_op', message: 'op must be "consent".' };
+  if (typeof b.work !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(b.work)) return { error: 'bad_work', message: 'work must be an opaque sha256:<64 hex> hash.' };
+  if (!Array.isArray(b.grants) || !b.grants.length) return { error: 'bad_grants', message: 'grants must be a non-empty list drawn from: ' + CONSENT_GRANTS.join(', ') + '.' };
+  if (new Set(b.grants).size !== b.grants.length || b.grants.some((g) => !CONSENT_GRANTS.includes(g))) return { error: 'bad_grants', message: 'grants must be unique and drawn from: ' + CONSENT_GRANTS.join(', ') + '.' };
+  if (b.note !== undefined && (typeof b.note !== 'string' || b.note.length > 200)) return { error: 'bad_note', message: 'note must be a string of at most 200 characters.' };
+  const out = { op: 'consent', work: b.work, grants: [...b.grants].sort() };
+  if (b.node_key !== undefined) out.node_key = b.node_key;
+  if (b.note !== undefined) out.note = b.note.normalize('NFC').replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
+  return { body: out };
+}
+
 export function replyRows(replies, sent) {
   return sent.map((s) => {
     const r = (replies || []).find((x) => x.tid === s.tid);

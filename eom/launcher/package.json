@@ -6,7 +6,8 @@
   "license": "SEE LICENSE IN /LICENSE",
   "scripts": {
     "dev": "node launch.mjs",
-    "test": "node --test test/launcher.test.mjs",
+    "test": "node --test test/launcher.test.mjs test/battle.test.mjs",
+    "e2e": "node --test test/e2e.test.mjs",
     "tauri": "cd tauri && npx @tauri-apps/cli dev",
     "tauri:build": "cd tauri && npx @tauri-apps/cli build",
     "tauri:icons": "cd tauri && npx @tauri-apps/cli icon src-tauri/icons/icon.png"

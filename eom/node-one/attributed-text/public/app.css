@@ -227,5 +227,6 @@ textarea:focus, input:focus { outline: 2px solid var(--t-muted); outline-offset:
 .river .rnode { background: hsl(var(--h) var(--s) var(--t-pl)); position: absolute; left: var(--x); top: calc(var(--li) * 3.4rem + 0.5rem + 1.7rem); width: var(--sz); height: var(--sz); margin: calc(var(--sz) / -2) 0 0 calc(var(--sz) / -2); border-radius: 50%; border: 2px dashed var(--t-muted); z-index: 1; }
 .river .rnode.ok { border: 2px solid var(--t-ink); }
 .river .rnode.rev { border-radius: 3px; }
+.river .rnode.dep { border-width: 2px; }
 .river .rnode:hover, .river .rnode:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
 .rends { display: flex; justify-content: space-between; }

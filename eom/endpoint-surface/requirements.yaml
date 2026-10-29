@@ -91,6 +91,10 @@ endpoints:
       - id: REQ-DEP-3
         rule: response carries format, wire, the queried node_key, the registry record (or null), count, and the matching export entries verbatim (same creator_verified / node_key_fingerprint truth as export; no IPs, ever)
 
+# W3 (EOM-E2E-BATTLE-2026-10-29), comment only - no requirement id is added or changed: node-one also answers
+# POST /api/consent with consent_gate_unbuilt (501) after reading a JSON object body, so a client is refused
+# honestly instead of hitting a 404. Nothing is stored or charged and no consent grammar is defined here; the
+# deposits-spec ruling is still open. The launcher's consent envelope is a shape contract only.
 join_gate:
   accept_kinds: [node-key, session-log]
   payload_mapping:

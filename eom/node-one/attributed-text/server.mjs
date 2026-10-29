@@ -199,6 +199,14 @@ const server = http.createServer(async (req, res) => {
       if (receipt.status === 'deposited' && !receipt.duplicate) { charge(ip); charge('ingest-global'); }
       return send(res, 200, { ok: true, ...wireEcho, ...receipt });
     }
+    if (req.method === 'POST' && p === '/api/consent') {
+      // W3 (EOM-E2E-BATTLE-2026-10-29): the consent door exists so a client can be refused HONESTLY instead of
+      // hitting a 404. Fail closed: the body must be a JSON object (readJson), then the answer is the same
+      // consent_gate_unbuilt 501 every fork/remix attempt gets. Nothing is stored, nothing is charged, and no
+      // consent grammar is invented here - the deposits-spec ruling is still open.
+      await readJson(req);
+      return fail(res, 501, 'consent_gate_unbuilt', 'The consent layer is not built on this node. Nothing was stored.', { ...wireEcho });
+    }
     if (req.method === 'POST' && p === '/api/admin/revert') {
       // Admin attempts charge up front: failed-token retries are the attack to price here,
       // not an honest user's validation slip.

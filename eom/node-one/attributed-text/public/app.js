@@ -421,46 +421,78 @@
   }
 
 
-  // ---------- timeline river (R4, 2026-10-29) ----------
+  // ---------- timeline river (R4 + W5) ----------
   // The demo's centerpiece: the linear change history laid out on REAL time. One lane per author
-  // (first-appearance order), x = when the version landed, node size = words changed, a node is a
-  // link to that version. Verified key = solid ring + check, typed name = dashed ring (the same
-  // claims-vs-proof legend as the page). Data is /api/versions only (stats + name + ts); this view
-  // computes no trust, and a linear chain is shown as linear - branches need parents + the consent gate.
+  // (first-appearance order), x = when it landed, node size = words changed. Two kinds of node:
+  // page versions (/api/versions: seed, edit, revert) and signed/typed DEPOSITS that arrived through the
+  // join gate (the export's ingest entries - what a launcher sends; /api/versions never carries them).
+  // Verified key = solid ring, typed name or unchecked key = dashed ring (the page's claims-vs-proof
+  // legend). The view computes no trust: `verified` comes from the export's creator_verified. A linear
+  // chain is drawn linear; anything that CLAIMS lineage (parents, a derivation other than original) is
+  // refused here and counted, because branches wait for the consent layer.
+  // ===== RIVER-MODEL-BEGIN (pure: tests load this block alone; no DOM, no api) =====
+  function riverModel(versions, entries, verifiedMap) {
+    const rows = [], refused = [], skipped = [];
+    const branchy = (r) => (Array.isArray(r.parents) && r.parents.length > 0) || (r.derivation !== undefined && r.derivation !== null && r.derivation !== 'original');
+    const edKey = (n) => typeof n === 'string' && n.startsWith('key:ed25519:');
+    for (const r of Array.isArray(versions) ? versions : []) {
+      if (!r || typeof r !== 'object' || !Number.isInteger(r.v) || typeof r.name !== 'string' || !r.name) { skipped.push({ why: 'malformed version row' }); continue; }
+      if (branchy(r)) { refused.push({ v: r.v, why: 'branch' }); continue; }
+      const kind = r.kind === 'seed' || r.kind === 'revert' ? r.kind : 'edit';   // v1 rows carry no kind: an edit
+      const words = r.stats && typeof r.stats === 'object' ? (Number(r.stats.added_words) || 0) + (Number(r.stats.removed_words) || 0) : null;
+      const rec = verifiedMap && typeof verifiedMap.get === 'function' ? verifiedMap.get(r.name) : null;
+      rows.push({ id: 'v' + r.v, lane: r.name, ts: Date.parse(r.ts), kind, words, v: r.v, restored_v: r.restored_v, href: '#/v/' + r.v, verified: edKey(r.name) && !!(rec && rec.verified) });
+    }
+    for (const e of Array.isArray(entries) ? entries : []) {
+      if (!e || typeof e !== 'object' || !e.provenance || e.provenance.entry_kind !== 'ingest') continue;   // page entries come from versions
+      if (typeof e.creator_ref !== 'string' || !e.creator_ref || !Number.isInteger(e.v)) { skipped.push({ why: 'malformed deposit entry' }); continue; }
+      if (branchy(e)) { refused.push({ v: e.v, why: 'branch' }); continue; }
+      rows.push({ id: 'd' + e.v, lane: e.creator_ref, ts: Date.parse(e.ts), kind: 'deposit', words: null, v: e.v, href: '#/d/' + encodeURIComponent(e.creator_ref), verified: edKey(e.creator_ref) && e.creator_verified === true });
+    }
+    const timed = rows.length > 0 && rows.every((r) => Number.isFinite(r.ts));   // any bad ts: honest sequence order, not a guessed clock
+    rows.sort((x, y) => (timed && x.ts !== y.ts ? x.ts - y.ts : x.v - y.v));
+    const lanes = [];
+    for (const r of rows) if (!lanes.includes(r.lane)) lanes.push(r.lane);
+    const t0 = timed ? rows[0].ts : 0, span = timed ? rows[rows.length - 1].ts - t0 : 0;
+    const maxW = Math.max(1, ...rows.map((r) => r.words || 0));
+    const nodes = rows.map((r, i) => ({
+      ...r, laneIndex: lanes.indexOf(r.lane),
+      x: Number((3 + (timed && span > 0 ? (r.ts - t0) / span : rows.length > 1 ? i / (rows.length - 1) : 0.5) * 94).toFixed(2)),
+      size: r.words === null ? 16 : 14 + Math.round(18 * Math.sqrt(r.words / maxW)),
+    }));
+    return { axis: timed ? 'time' : 'order', lanes, nodes, refused, skipped };
+  }
+  // ===== RIVER-MODEL-END =====
   async function viewTimeline() {
     const [vs, map] = await Promise.all([api('/api/versions'), verifMap()]);
-    const lanes = [];
-    for (const v of vs) if (!lanes.includes(v.name)) lanes.push(v.name);
-    const t = vs.map((v) => Date.parse(v.ts)).filter((n) => Number.isFinite(n));
-    const t0 = Math.min(...t), t1 = Math.max(...t), span = t1 - t0;
-    const pos = (v, i) => (span > 0 ? (Date.parse(v.ts) - t0) / span : vs.length > 1 ? i / (vs.length - 1) : 0.5);
-    const words = (v) => (v.stats ? (v.stats.added_words || 0) + (v.stats.removed_words || 0) : 0);
-    const maxW = Math.max(1, ...vs.map(words));
+    let entries = []; try { entries = ((await exportX()) || {}).entries || []; } catch { /* export paused: page versions still draw, deposits wait */ }
+    const m = riverModel(vs, entries, map);
     const river = el('div', 'river');
-    river.style.setProperty('--lanes', String(Math.max(1, lanes.length)));
-    lanes.forEach((name, li) => {
+    river.style.setProperty('--lanes', String(Math.max(1, m.lanes.length)));
+    m.lanes.forEach((name, li) => {
       const lane = el('div', 'lane'); lane.style.setProperty('--li', String(li));
-      const lab = el('a', 'lanelabel ui'); lab.href = '#/a/' + encodeURIComponent(name);
-      lab.append(el('span', `dot a${hueSlot(name)}`), ' ' + (isEdKey(name) ? 'key · ' + name.slice(12, 20) : name));
+      const lab = el('a', 'lanelabel ui'); lab.href = isEdKey(name) ? '#/d/' + encodeURIComponent(name) : '#/a/' + encodeURIComponent(name);
+      lab.append(el('span', `dot a${hueSlot(name)}`), ' ' + (isEdKey(name) ? 'key · ' + name.slice(12, 20) : name.replace(/^name:/, '')));
       lane.append(lab); river.append(lane);
     });
-    vs.forEach((v, i) => {
-      const li = lanes.indexOf(v.name), verified = !!(map && map.get(v.name) && map.get(v.name).verified);
-      const size = 14 + Math.round(18 * Math.sqrt(words(v) / maxW));
-      const a = el('a', `rnode a${hueSlot(v.name)}${isEdKey(v.name) && verified ? ' ok' : ' claim'}${v.kind === 'revert' ? ' rev' : ''}`);
-      a.href = '#/v/' + v.v;
-      a.style.setProperty('--x', (3 + pos(v, i) * 94).toFixed(2) + '%');
-      a.style.setProperty('--li', String(li)); a.style.setProperty('--sz', size + 'px');
-      const what = v.kind === 'seed' ? 'first text' : v.kind === 'revert' ? `restored v${v.restored_v}` : `+${v.stats.added_words} −${v.stats.removed_words} words`;
-      a.title = `v${v.v} · ${v.name} · ${what} · ${ago(v.ts)}${verified ? ' · key checked at ingest' : isEdKey(v.name) ? ' · signature not checked: a claim' : ' · typed name: a claim'}`;
+    for (const n of m.nodes) {
+      const a = el('a', `rnode a${hueSlot(n.lane)}${n.verified ? ' ok' : ' claim'}${n.kind === 'revert' ? ' rev' : ''}${n.kind === 'deposit' ? ' dep' : ''}`);
+      a.href = n.href;
+      a.style.setProperty('--x', n.x + '%'); a.style.setProperty('--li', String(n.laneIndex)); a.style.setProperty('--sz', n.size + 'px');
+      const what = n.kind === 'seed' ? 'first text' : n.kind === 'revert' ? `restored v${n.restored_v}` : n.kind === 'deposit' ? 'deposit' : `${n.words === null ? 'edit' : n.words + ' words changed'}`;
+      a.title = `v${n.v} · ${n.lane.replace(/^name:/, '')} · ${what}${Number.isFinite(n.ts) ? ' · ' + ago(new Date(n.ts).toISOString()) : ''}${n.verified ? ' · key checked at ingest' : isEdKey(n.lane) ? ' · signature not checked: a claim' : ' · typed name: a claim'}`;
       a.setAttribute('aria-label', a.title);
       river.append(a);
-    });
-    const ends = el('div', 'rends meta ui'); ends.append(el('span', '', vs.length ? `first · ${ago(vs[0].ts)}` : ''), el('span', '', vs.length ? `latest · ${ago(vs[vs.length - 1].ts)}` : ''));
+    }
+    const first = m.nodes[0], last = m.nodes[m.nodes.length - 1];
+    const ends = el('div', 'rends meta ui');
+    ends.append(el('span', '', first && Number.isFinite(first.ts) ? `first · ${ago(new Date(first.ts).toISOString())}` : ''), el('span', '', last && Number.isFinite(last.ts) ? `latest · ${ago(new Date(last.ts).toISOString())}` : ''));
+    const foot = ['This is one straight line of edits and deposits. Branches (forks and remixes) arrive with the consent layer.'];
+    if (m.refused.length) foot.push(`${m.refused.length} ${m.refused.length === 1 ? 'entry claims' : 'entries claim'} a branch and ${m.refused.length === 1 ? 'is' : 'are'} not drawn.`);
+    if (m.axis === 'order') foot.push('Some entries have no usable time, so dots are in sequence order, not clock time.');
     mount(nav('#/', '← Back'), el('h2', '', 'How this text changed'),
-      el('p', 'meta ui', 'Left to right is real time. One row per author; bigger dot, bigger edit. Solid ring: a key whose signature the gateway checked. Dashed ring: a name as typed, a claim. Tap a dot to read that version.'),
-      river, ends,
-      el('p', 'meta ui', 'This is one straight line of edits. Branches (forks and remixes) arrive with the consent layer.'));
+      el('p', 'meta ui', 'Left to right is real time. One row per author; bigger dot, bigger edit; a small square-cornered dot is a restore, a small dot is a deposit. Solid ring: a key whose signature the gateway checked. Dashed ring: a name as typed, or a key not checked, a claim. Tap a dot to open it.'),
+      river, ends, el('p', 'meta ui', foot.join(' ')));
   }
 
   async function viewVersion(n) {

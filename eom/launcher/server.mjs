@@ -26,7 +26,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import {
   WIRE_PIN, helloGate, canEmit, NODE_YAML_DEFAULT, renderDeclarations, appendPacket, parseReplies, parseQueueTasks,
-  composeBrief, lintPointers,
+  composeBrief, lintPointers, watchReplies, buildConsent,
 } from './launcher-core.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -131,20 +131,60 @@ const cleanStr = (s, max = 200) => String(s ?? '').normalize('NFC').replace(/[\u
 
 // The proxy: byte-verbatim pass-through. No re-serialization anywhere on the response path -
 // an opaque hash that survives here unchanged is the whole honesty story of the Baseline tab.
-async function proxy(res, method, apiPath, body, base = NODE_ONE_URL) {
-  let r;
-  try {
-    r = await fetch(base + apiPath, {
-      method,
-      headers: method === 'POST' ? { 'content-type': 'application/json' } : {},
-      body: method === 'POST' ? body : undefined,
-    });
-  } catch (e) {
-    return fail(res, 502, 'node_unreachable', `Cannot reach ${base === NODE_ONE_URL ? 'node-one' : 'the gateway'} at ${base} (${e.cause?.code || e.message}).${base === NODE_ONE_URL ? ' Start it: node eom/node-one/attributed-text/server.mjs' : ''}`);
+// W4 retry semantics (EOM-E2E-BATTLE-2026-10-29), gateway SENDS only: a thrown transport error (no HTTP
+// response at all - connection reset, refused, timeout) is retried up to two more times with the SAME
+// signed bytes. That is safe by construction: Ed25519 is deterministic and the gateway acks a replay of
+// identical canonical bytes as duplicate:true with the original receipt. An HTTP response of ANY status is
+// final and never retried - a refusal is an answer, and a 5xx may have deposited. The attempt count is
+// reported in x-seams-attempts, never hidden.
+const SEND_ATTEMPTS = 3;
+async function proxy(res, method, apiPath, body, base = NODE_ONE_URL, onResult = null) {
+  let r; let attempts = 0;
+  const max = method === 'POST' && base !== NODE_ONE_URL ? SEND_ATTEMPTS : 1;
+  let lastErr;
+  while (attempts < max) {
+    attempts++;
+    try {
+      r = await fetch(base + apiPath, {
+        method,
+        headers: method === 'POST' ? { 'content-type': 'application/json' } : {},
+        body: method === 'POST' ? body : undefined,
+      });
+      break;
+    } catch (e) { lastErr = e; r = undefined; }
+  }
+  if (!r) {
+    const e = lastErr;
+    return fail(res, 502, 'node_unreachable', `Cannot reach ${base === NODE_ONE_URL ? 'node-one' : 'the gateway'} at ${base} (${e.cause?.code || e.message}).${base === NODE_ONE_URL ? ' Start it: node eom/node-one/attributed-text/server.mjs' : ` Tried ${attempts} time${attempts === 1 ? '' : 's'}; nothing is known to have deposited.`}`);
   }
   const text = await r.text();
-  res.writeHead(r.status, { 'content-type': r.headers.get('content-type') || 'application/json; charset=utf-8', ...HEADERS });
+  if (onResult) { try { onResult(r.status, text, attempts); } catch { /* the log is a convenience; the reply is what matters */ } }
+  res.writeHead(r.status, { 'content-type': r.headers.get('content-type') || 'application/json; charset=utf-8', ...(base !== NODE_ONE_URL ? { 'x-seams-attempts': String(attempts) } : {}), ...HEADERS });
   res.end(text);
+}
+
+// W2: launcher-side record of what THIS launcher sent and what came back. Not a verdict: the receipt
+// is stored as the target returned it; creator_verified in it is the target's word, never ours.
+const EMISSIONS_FILE = () => opsFile('emissions.jsonl');
+function recordEmission(target, body, status, text, attempts) {
+  let j = null; try { j = JSON.parse(text); } catch { /* non-JSON reply: recorded as null receipt */ }
+  const row = { ts: new Date().toISOString(), target, op: body.op, kind: body.kind ?? null, node_key: body.node_key ?? null, http: status, attempts,
+    status: j && typeof j.status === 'string' ? j.status : null, error: j && typeof j.error === 'string' ? j.error : null,
+    receipt: j && typeof j.receipt === 'string' ? j.receipt : null, duplicate: j && typeof j.duplicate === 'boolean' ? j.duplicate : null,
+    creator_verified: j && typeof j.creator_verified === 'boolean' ? j.creator_verified : null, v: j && Number.isInteger(j.v) ? j.v : null };
+  fs.appendFileSync(EMISSIONS_FILE(), JSON.stringify(row) + '\n');
+}
+function readEmissions() {
+  try { return fs.readFileSync(EMISSIONS_FILE(), 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean); } catch { return []; }
+}
+const sha256Hex = (u8) => crypto.createHash('sha256').update(u8).digest('hex');
+const WATCH_FILE = () => opsFile('watcher.json');
+function readCursor() {
+  try { const j = JSON.parse(fs.readFileSync(WATCH_FILE(), 'utf8')); return j && j.v === 1 && j.replies ? j.replies : null; } catch { return null; }
+}
+function writeCursor(cursor) { // atomic: a crash mid-write must never leave a half cursor
+  const tmp = WATCH_FILE() + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify({ v: 1, replies: cursor }) + '\n'); fs.renameSync(tmp, WATCH_FILE());
 }
 
 const server = http.createServer(async (req, res) => {
@@ -175,23 +215,28 @@ const server = http.createServer(async (req, res) => {
       if (p === '/gateway/hello' && req.method === 'GET') return proxy(res, 'GET', '/api/hello', undefined, GATEWAY_URL);
       if (p === '/gateway/export' && req.method === 'GET') return proxy(res, 'GET', '/api/export', undefined, GATEWAY_URL);
       if (p === '/gateway/deposits' && req.method === 'GET') return proxy(res, 'GET', '/api/deposits' + url.search, undefined, GATEWAY_URL);
-      if (p === '/gateway/emit' && req.method === 'POST') {
+      if ((p === '/gateway/emit' || p === '/gateway/consent') && req.method === 'POST') {
+        const isConsent = p === '/gateway/consent';
         let b; try { b = JSON.parse((await readBody(req)) || '{}'); } catch { return fail(res, 400, 'bad_json', 'Bad request.'); }
         const kf = K.readKeyPairFile(opsFile('node-key.json'));
         if (!kf) return fail(res, 400, 'no_key', 'The launcher holds no key yet - mint one in the Keys tab first. Nothing was sent.');
-        const body = b.body && typeof b.body === 'object' ? { ...b.body } : null;
-        if (!body) return fail(res, 400, 'bad_body', 'body must be an emit object.');
-        if (body.op !== 'emit') return fail(res, 400, 'unknown_op', 'The gateway route sends op "emit" only.');
+        let body = b.body && typeof b.body === 'object' ? { ...b.body } : null;
+        if (!body) return fail(res, 400, 'bad_body', 'body must be ' + (isConsent ? 'a consent' : 'an emit') + ' object.');
+        if (isConsent) {
+          const built = buildConsent(body);
+          if (built.error) return fail(res, 400, built.error, built.message);
+          body = built.body;
+        } else if (body.op !== 'emit') return fail(res, 400, 'unknown_op', 'The gateway route sends op "emit" only.');
         if (body.node_key === undefined || body.node_key === null || body.node_key === '') body.node_key = kf.nodeKey;
         if (body.node_key !== kf.nodeKey) return fail(res, 400, 'foreign_key', 'This window signs only with the key it holds; a different node_key is refused before anything leaves.');
-        // rails before emit, against the GATEWAY's own hello, fetched now: pinned wire, closed gate, not quarantined
+        // rails before send, against the GATEWAY's own hello, fetched now: pinned wire, closed gate, not quarantined
         let hello = null;
-        try { const h = await fetch(GATEWAY_URL + '/api/hello'); hello = await h.json(); } catch { /* unreachable: held below */ }
+        try { const h = await fetch(GATEWAY_URL + '/api/hello'); hello = await h.json(); } catch { /* unreachable or not JSON: held below */ }
         const hold = canEmit({ rail: helloGate(hello), quarantined: hello && /QUARANTINED/i.test(String(hello.integrity || '')) });
         if (!hold.allow) return send(res, 409, { error: hold.hold.name, message: hold.hold.msg, foot: hold.hold.foot });
         delete body.sig;
         body.sig = K.signBody(kf.privB64, body);
-        return proxy(res, 'POST', '/api/ingest', JSON.stringify(body), GATEWAY_URL);
+        return proxy(res, 'POST', isConsent ? '/api/consent' : '/api/ingest', JSON.stringify(body), GATEWAY_URL, (st, tx, n) => recordEmission('gateway', body, st, tx, n));
       }
       return fail(res, 404, 'not_found', 'Not found.');
     }
@@ -246,7 +291,19 @@ const server = http.createServer(async (req, res) => {
       if (body.node_key !== kf.nodeKey) return fail(res, 400, 'foreign_key', 'This window signs only with the key it holds; a different node_key is refused before anything leaves.');
       delete body.sig; // never sign over a signature: the canonical form is the body MINUS sig
       body.sig = K.signBody(kf.privB64, body);
-      return proxy(res, 'POST', '/api/ingest', JSON.stringify(body));
+      return proxy(res, 'POST', '/api/ingest', JSON.stringify(body), NODE_ONE_URL, (st, tx, n) => recordEmission('local', body, st, tx, n));
+    }
+    if (p === '/agent/consent' && req.method === 'POST') {
+      let b; try { b = JSON.parse((await readBody(req)) || '{}'); } catch { return fail(res, 400, 'bad_json', 'Bad request.'); }
+      const kf = K.readKeyPairFile(opsFile('node-key.json'));
+      if (!kf) return fail(res, 400, 'no_key', 'The launcher holds no key yet - mint one in the Keys tab first. Nothing was sent.');
+      const built = buildConsent(b.body);
+      if (built.error) return fail(res, 400, built.error, built.message);
+      const body = built.body;
+      if (body.node_key === undefined || body.node_key === null || body.node_key === '') body.node_key = kf.nodeKey;
+      if (body.node_key !== kf.nodeKey) return fail(res, 400, 'foreign_key', 'This window signs only with the key it holds; a different node_key is refused before anything leaves.');
+      body.sig = K.signBody(kf.privB64, body);
+      return proxy(res, 'POST', '/api/consent', JSON.stringify(body), NODE_ONE_URL, (st, tx, n) => recordEmission('local', body, st, tx, n));
     }
 
     // ops file editors (the three files the launcher owns; names whitelisted, traversal dead on arrival)
@@ -313,6 +370,16 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, {
         outbox: { path: path.relative(here, file), exists, tasks: exists ? parseQueueTasks(fs.readFileSync(file, 'utf8')) : [] },
       });
+    }
+    // W2: GET peeks (no cursor movement), POST consumes (advances the persisted cursor).
+    if (p === '/agent/watch' && (req.method === 'GET' || req.method === 'POST')) {
+      const file = opsFile('agent-replies.md');
+      const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+      const r = watchReplies(text, readCursor(), sha256Hex);
+      if (req.method === 'POST') writeCursor(r.cursor);
+      const em = readEmissions();
+      return send(res, 200, { entries: r.entries, cursor: r.cursor, reset: r.reset, pending_partial_bytes: r.pending_partial, consumed: req.method === 'POST', honesty: 'asserted',
+        emissions: { total: em.length, recent: em.slice(-20), note: 'receipts as the target returned them; creator_verified in a row is the target\'s word' } });
     }
     if (p === '/agent/replies' && req.method === 'GET') {
       const file = opsFile('agent-replies.md');
