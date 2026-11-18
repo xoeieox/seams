@@ -61,7 +61,7 @@ Helper (pointer, not vendored)
 
 Runtime (eom/) - not shipped in this repo
   The launcher, node-one and endpoint-surface split out to the runtime
-  repo (working name seams-runtime) in the 2026-11-18 two-repo split
+  repo seams-runtime in the 2026-11-18 two-repo split
   under owner GO; their lineage record (eom-node-one branch, head
   2bfcaa2 2026-10-28, design handoff 2026-10-26, KEYS pass 2026-10-28)
   moved to that repo's PROVENANCE.txt. tests/test_endpoint_conformance.py

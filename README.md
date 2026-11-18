@@ -3,10 +3,9 @@
 Protocol-version seed for the SEAMS wire - the attribution and value-routing
 protocol for creative work shared across AI-augmented collaborators. This
 repo is the contract and its referee; the runtime (launcher UI + demo
-node-one) ships in the sibling runtime repo (working name `seams-runtime`).
+node-one) ships in the sibling runtime repo, [github.com/xoeieox/seams-runtime](https://github.com/xoeieox/seams-runtime).
 
-**Edition: `seams-wire/0.3-draft`.** Working repo name `seams-protocol` -
-final naming is the owner's call before any push.
+**Edition: `seams-wire/0.3-draft`.**
 
 **What Seams is.** Two problems, one wire. First, the attribution hole:
 AI-assisted creative work currently erases attribution - the model's output
@@ -70,8 +69,8 @@ targets) see `kit/README.md`.
 
 ## The other half of the split
 
-The launcher and node-one ship in the sibling runtime repo (working name
-`seams-runtime`): clone it, run `node eom/launcher/launch.mjs`, and the UI
-comes up on `http://127.0.0.1:4173` with node-one on `http://127.0.0.1:8080`.
-That repo holds no spec and no vectors - the spec and this 145-case selftest
-live here. Repo names are placeholders; final naming is the owner's call.
+The launcher and node-one ship in the sibling runtime repo
+([github.com/xoeieox/seams-runtime](https://github.com/xoeieox/seams-runtime)):
+clone it, run `node eom/launcher/launch.mjs`, and the UI comes up on
+`http://127.0.0.1:4173` with node-one on `http://127.0.0.1:8080`.
+That repo holds no spec and no vectors - the spec and this 145-case selftest live here.
