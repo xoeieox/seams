@@ -72,3 +72,12 @@ Verbatim from the additions registry (`kit/oracles.py`, quoted in
 ## Held addition
 
 - **A5 - EXCLUDED from this canon**: held as referee-enforced only, not ratified, until a deposits-spec sentence authors the tier policy; the GM-versus-player taxonomy is unresolved and Kyma-shaped, not protocol-shaped; exclusion ruling `decision/seams-rulings-2026-10-17` (2026-10-17); the vector suite and the stub carry none of its behavior at this cut, and ratification lands with the 0.4 promotion queue, not here.
+
+## Ratified hardening note (2026-11-18) - ingest strip class
+
+Invisible codepoints never reach a content hash: the ingest strip class defined in
+`spec/WIRE-V0.md` section 2 runs before hashing, because display-identical text must not
+hash-distinct and a hidden codepoint must not let a foreign key squat an entry
+(red-team v3 F-25/O1). This is enforcement context for A4 (only the creator's key counts):
+key control is proven by signatures over canonical bytes, not by display-identical text
+variants. Pinned by `kit/vectors/squat.json`.

@@ -1,0 +1,453 @@
+{
+ "wire": "v0.3-draft",
+ "about": "Ingest strip class (anti-squat, red-team v3 F-25/O1): invisible codepoints are stripped at ingest and collapse to the clean content hash - display-identical text must never hash-distinct, and the cross-key squat guard covers the invisible variant. The U+FE01-U+FE0F variation-selector siblings (VS16 pinned here) are KEPT: they can legitimately change glyph/emoji presentation, so stripping them would mutate visible content (U+FE00 alone is in the class by the 2026-11-18 ruling).",
+ "cases": [
+  {
+   "name": "squat-baseline-clean-deposit",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-a",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "content_hash": "sha256:db2670a86ebc6d1c7a6ad1df94ebaea3335c0e47d22719499796eb21495713c8"
+   }
+  },
+  {
+   "name": "squat-collapse-00ad",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:squat-a",
+     "tier": "player",
+     "kind": "session-log",
+     "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+     "parents": [],
+     "derivation": "original",
+     "provenance": {
+      "origin": "authored"
+     }
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-a",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLsKt",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "content_hash": "sha256:db2670a86ebc6d1c7a6ad1df94ebaea3335c0e47d22719499796eb21495713c8"
+   }
+  },
+  {
+   "name": "squat-collapse-2060",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:squat-a",
+     "tier": "player",
+     "kind": "session-log",
+     "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+     "parents": [],
+     "derivation": "original",
+     "provenance": {
+      "origin": "authored"
+     }
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-a",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLuKBoA==",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "content_hash": "sha256:db2670a86ebc6d1c7a6ad1df94ebaea3335c0e47d22719499796eb21495713c8"
+   }
+  },
+  {
+   "name": "squat-collapse-fe00",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:squat-a",
+     "tier": "player",
+     "kind": "session-log",
+     "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+     "parents": [],
+     "derivation": "original",
+     "provenance": {
+      "origin": "authored"
+     }
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-a",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLu+4gA==",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "content_hash": "sha256:db2670a86ebc6d1c7a6ad1df94ebaea3335c0e47d22719499796eb21495713c8"
+   }
+  },
+  {
+   "name": "squat-collapse-061c",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:squat-a",
+     "tier": "player",
+     "kind": "session-log",
+     "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+     "parents": [],
+     "derivation": "original",
+     "provenance": {
+      "origin": "authored"
+     }
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-a",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLtic",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "content_hash": "sha256:db2670a86ebc6d1c7a6ad1df94ebaea3335c0e47d22719499796eb21495713c8"
+   }
+  },
+  {
+   "name": "squat-collapse-180e",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:squat-a",
+     "tier": "player",
+     "kind": "session-log",
+     "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+     "parents": [],
+     "derivation": "original",
+     "provenance": {
+      "origin": "authored"
+     }
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-a",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLuGgjg==",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "content_hash": "sha256:db2670a86ebc6d1c7a6ad1df94ebaea3335c0e47d22719499796eb21495713c8"
+   }
+  },
+  {
+   "name": "squat-collapse-08e2",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:squat-a",
+     "tier": "player",
+     "kind": "session-log",
+     "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+     "parents": [],
+     "derivation": "original",
+     "provenance": {
+      "origin": "authored"
+     }
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-a",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLuCjog==",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "content_hash": "sha256:db2670a86ebc6d1c7a6ad1df94ebaea3335c0e47d22719499796eb21495713c8"
+   }
+  },
+  {
+   "name": "squat-collapse-2061",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:squat-a",
+     "tier": "player",
+     "kind": "session-log",
+     "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+     "parents": [],
+     "derivation": "original",
+     "provenance": {
+      "origin": "authored"
+     }
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-a",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLuKBoQ==",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "content_hash": "sha256:db2670a86ebc6d1c7a6ad1df94ebaea3335c0e47d22719499796eb21495713c8"
+   }
+  },
+  {
+   "name": "squat-collapse-2062-2063",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:squat-a",
+     "tier": "player",
+     "kind": "session-log",
+     "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+     "parents": [],
+     "derivation": "original",
+     "provenance": {
+      "origin": "authored"
+     }
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-a",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLuKBouKBow==",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "content_hash": "sha256:db2670a86ebc6d1c7a6ad1df94ebaea3335c0e47d22719499796eb21495713c8"
+   }
+  },
+  {
+   "name": "squat-collapse-2064",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:squat-a",
+     "tier": "player",
+     "kind": "session-log",
+     "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+     "parents": [],
+     "derivation": "original",
+     "provenance": {
+      "origin": "authored"
+     }
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-a",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLuKBpA==",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "content_hash": "sha256:db2670a86ebc6d1c7a6ad1df94ebaea3335c0e47d22719499796eb21495713c8"
+   }
+  },
+  {
+   "name": "squat-collapse-e0001",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:squat-a",
+     "tier": "player",
+     "kind": "session-log",
+     "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+     "parents": [],
+     "derivation": "original",
+     "provenance": {
+      "origin": "authored"
+     }
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-a",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLvOggIE=",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "content_hash": "sha256:db2670a86ebc6d1c7a6ad1df94ebaea3335c0e47d22719499796eb21495713c8"
+   }
+  },
+  {
+   "name": "squat-crosskey-word-joiner-goes-to-the-guard",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:squat-a",
+     "tier": "player",
+     "kind": "session-log",
+     "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+     "parents": [],
+     "derivation": "original",
+     "provenance": {
+      "origin": "authored"
+     }
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-b",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLuKBoA==",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "error": "already_deposited"
+   }
+  },
+  {
+   "name": "squat-keep-display-visible-vs16",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:squat-a",
+     "tier": "player",
+     "kind": "session-log",
+     "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+     "parents": [],
+     "derivation": "original",
+     "provenance": {
+      "origin": "authored"
+     }
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-b2",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLu+4jw==",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "content_hash": "sha256:79477cc76027506bba8d6241fe88a178f4e5a16d9cde662fd7d63c51aa6c04c6"
+   }
+  },
+  {
+   "name": "squat-keep-display-visible-vs01",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:squat-a",
+     "tier": "player",
+     "kind": "session-log",
+     "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLg==",
+     "parents": [],
+     "derivation": "original",
+     "provenance": {
+      "origin": "authored"
+     }
+    }
+   ],
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:squat-b2",
+    "tier": "player",
+    "kind": "session-log",
+    "content_b64": "VGhlIG1hcm1vdCBrZWVwcyB0aGUgbGVkZ2VyLu+4jg==",
+    "parents": [],
+    "derivation": "original",
+    "provenance": {
+     "origin": "authored"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "content_hash": "sha256:2acb98cf51dace4ff2b5e8386952f063c191b4af15dd58ad1c6ac79821302f4e"
+   }
+  }
+ ]
+}

@@ -76,10 +76,11 @@ review` means a human should confirm; `fail` means a deterministic oracle saw it
 
 ## Vectors
 
-`vectors/*.json` are the 131 shared test vectors (counted truth - reconciled from the stale
+`vectors/*.json` are the 145 shared test vectors (counted truth - reconciled from the stale
 127 figure in the 2026-11-18 surgery pass), shipped here as a reviewable file set;
 `MANIFEST.sha256` pins them. They did not exist
-on your side, so there is nothing to reconcile against: ratify on receipt. Five recursive
+on your side, so there is nothing to reconcile against: ratify on receipt. The `squat.json` suite (2026-11-18) pins the ingest strip class: invisible codepoints collapse at ingest
+and the cross-key squat guard covers the invisible variant. Five recursive
 deeper-split vectors are stand-in only (U5, not ratified) and skip on the helper.
 
 ## Findings flow

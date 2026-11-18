@@ -15,6 +15,7 @@ Usage:
   python3 seams_stub.py --fixture ../vectors/check_use.json   # then JSON lines on stdin
 """
 import base64
+import re
 import hashlib
 import json
 import sys
@@ -48,6 +49,21 @@ class WireError(ValueError):
 def canonical(obj):
     """Sorted keys, no whitespace, UTF-8. A stand-in for RFC 8785 (JCS)."""
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+
+
+INVISIBLE_STRIP = re.compile(
+    "[\u00ad\u061c\u08e2\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff\ufe00]"
+    "|\U000e0001")  # WIRE-V0 sec.2 ingest strip class (anti-squat, 2026-11-18); mirrors node-one lib.mjs BAD_CHARS
+
+
+def strip_invisible(content: bytes) -> bytes:
+    """Strip the invisible codepoints at ingest (join the stripped-class behavior, never 409).
+    Binary-inert: only touched when the bytes decode as text."""
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return content
+    return INVISIBLE_STRIP.sub("", text).encode("utf-8")
 
 
 def sha256(b):
@@ -293,7 +309,7 @@ class Stub:
             return {"wire": WIRE_VERSION, "status": "refused", "reason": "gm_tier"}
         if req.get("kind") not in KINDS:
             raise WireError("unknown_kind", f"kind must be one of {KINDS}")
-        content = base64.b64decode(req["content_b64"])
+        content = strip_invisible(base64.b64decode(req["content_b64"]))
         derivation = req.get("derivation", "original")
         if derivation not in ("original", "fork", "remix"):
             raise WireError("bad_derivation", derivation)

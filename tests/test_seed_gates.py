@@ -9,7 +9,7 @@ pipeline's default pytest run, so the engine gate is the spec's own DoD gate:
    sha-pinned source file matches the digests recorded in the spec manifest.
 2. stub selftest - SEAMS_TARGET=stub kit/battle.py selftest (the real
    subcommand; the spec's "battle.py vectors" wording is shorthand) reports
-   131/131 vectors pass, with the helper target silently absent because
+   145/145 vectors pass, with the helper target silently absent because
    zephyr-src is deliberately not vendored into this repo.
 3. negative/scrub gates - A5 is excluded from canon in spec/ (exactly one
    EXCLUDED-with-citation line), the invariants set is exactly N1-N9 plus
@@ -21,7 +21,7 @@ pipeline's default pytest run, so the engine gate is the spec's own DoD gate:
 Layout note: the spec manifest lists vectors/ and stub/ as root paths, but
 kit/battle.py discovers vectors and the stub strictly relative to its own
 directory (KIT-relative, no environment override). The kit-native layout
-(kit/vectors/, kit/stub/) is the only one where the 131/131 selftest passes
+(kit/vectors/, kit/stub/) is the only one where the 145/145 selftest passes
 and a fresh clone of this repo works, so the seed realizes those paths
 under kit/.
 
@@ -45,8 +45,8 @@ if _CACHE_DIR.is_dir():
     shutil.rmtree(_CACHE_DIR, ignore_errors=True)
 
 REPO = Path(__file__).resolve().parent.parent
-VECTOR_CASES_EXPECTED = 131
-SUITES_EXPECTED = 8
+VECTOR_CASES_EXPECTED = 145
+SUITES_EXPECTED = 9
 
 HARNESS_DIRS = {".git", ".pyuserbase", ".pytest_cache"}
 
@@ -84,7 +84,7 @@ DOCS_ARCHIVE_EXEMPT = {
 }
 
 SPEC_PINNED_FILES = {
-    "spec/WIRE-V0.md": "b93f10b1a7bdd26bac4dd58cc6ec9a70d5baa2eacfeec1f8b00881dad71ab5a1",
+    "spec/WIRE-V0.md": "db2503d4d77a42a9e49808171d368eb4071d40b8ba08d62522b445834f9cfdba",
     "spec/WIRE-CLAIMS-DRAFT.md": "6acd927324418a9ae650682e382521d4943caa2a9c0adf65cb4b9b18334f0305",  # public-candidate scrub 2026-10-19
     "kit/vectors/character_layers.json": "5098bd9c682d4f3d15c989f585810408d02af8c901226e0019d7b73cd647c5d6",
     "kit/vectors/check_use.json": "4a219fdd181ac1a33d87dcdb28cdaf9677cd761e7b17ed174824c1b1a55fbce5",
@@ -92,19 +92,20 @@ SPEC_PINNED_FILES = {
     "kit/vectors/emit.json": "fe94ba22880d8cf81e14fda8936d7530c8fc0ceca6278b2dff1fbd1f41653edc",
     "kit/vectors/hardening.json": "6942430f349254849067f55c2d39f8397c6bfa1305c812c0733e237c85f267c4",
     "kit/vectors/payments.json": "08c0945623a3f21946851d3fdfc69c46d29fab745fb19f829f0e7f7182f4f2ab",
+    "kit/vectors/squat.json": "af83226ab73eddb67604d85695d41e406394de25b9fd69e80a26e5f6c62b1888",
     "kit/vectors/scene_tags.json": "db6589da421395d6da03319eb685ebf759740e41652de89bc958b390f6c7259f",
     "kit/vectors/suggested.json": "f7685cee7ed45e46161e4b4545aa391c8cee0e4e430135caf1bc5ef72cc12f6c",
-    "kit/vectors/MANIFEST.sha256": "fc52131f799a8ec0ab689bf4a48aefb7b98713343604bc85dc5f92e430c7d999",
+    "kit/vectors/MANIFEST.sha256": "d0bd46c60a1563bbb4705a56ec6eff0da0fa858f6e34d8894a3ca3c0cb1a5300",
     "kit/battle.py": "7020311aa30f4393e650705ceb388b01e8fc4daebf7b3bbddc1f5ad5b5daf995",
     "kit/oracles.py": "48cd9c4658f2629076d7f357aafcf14bcfc6377ac7cff696c4bd9e19848a0a41",
     "kit/fake_llm.py": "c8e3911beb76922cb094a0fe6fb8d68810647983dab955868e7a031713fbec3e",
     "kit/bootstrap.sh": "e59eef717f3de568b738653ab555f2be52772b040b4eb135d4e3089a09fc0f63",
     "kit/config.example.env": "e05fa5eac0b951744c9d63b5fa555b91eef9e893d56a080c749c0a26cf84a851",
-    "kit/README.md": "c01b0e232bcb220e222d7e6fd18a3721be8d57a0fce647b90791ee221e558de2",  # reconciled 2026-11-18 surgery pass (owner GO): 127->131 prose + zephyr-src phantom removed
+    "kit/README.md": "0bcb8fc1d3442a5cd009c9566e6f8fe19a185d2288cccddf762d1fc06c946c82",  # reconciled 2026-11-18 surgery pass (owner GO): 127->145 prose + zephyr-src phantom removed
     "kit/briefs/attacker.md": "aa8bbc698c58d6a09f66605e013fcccfeacbfcd9ebab37ec161cdc34ca7d4ba2",
     "kit/briefs/foci.json": "13ed24c8b30c06625e91246e9489716b4cd8d6148c6a5f3086eae5d2b2ae9bb3",
     "kit/findings/TEMPLATE.md": "89a6d1d7686ee208dab092c154b0f43b1c10f19520cb58320d281bed81711f32",
-    "kit/stub/seams_stub.py": "0f2d59f1ce27ebf36299cad321d76eeb5ad42d49b79353d2bce368bfb549bbda",
+    "kit/stub/seams_stub.py": "6e02c74895a641590eee6a55e0a791c47640c785c1a60911cbe8d53248cae8e0",
     "docs/archive/00-README.md": "f51b27a4042c4a345af85320782d658da85e7553eb1776fc6b8774a906e3de39",  # closing-pass scrub 2026-10-19
 }
 
@@ -158,7 +159,7 @@ def test_manifest_pinned_files_match_spec_digests():
         assert got == want, f"{rel}: {got} != {want}"
 
 
-def test_vector_suites_parse_and_count_131():
+def test_vector_suites_parse_and_count_145():
     total = 0
     suites = 0
     for p in sorted((REPO / "kit" / "vectors").glob("*.json")):
@@ -170,14 +171,14 @@ def test_vector_suites_parse_and_count_131():
     assert total == VECTOR_CASES_EXPECTED
 
 
-def test_stub_selftest_131_of_131_helper_absent():
+def test_stub_selftest_145_of_145_helper_absent():
     env = dict(os.environ, SEAMS_TARGET="stub", PYTHONDONTWRITEBYTECODE="1")
     result = subprocess.run(
         [sys.executable, "kit/battle.py", "selftest"],
         cwd=REPO, env=env, capture_output=True, text=True, timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "stub: 131/131 vectors pass" in result.stdout
+    assert "stub: 145/145 vectors pass" in result.stdout
     assert "helper:" not in result.stdout
 
 

@@ -32,11 +32,11 @@ sha256sum -c MANIFEST.sha256
 cd kit && python3 battle.py selftest
 ```
 
-Expected on success: **`stub: 131/131 vectors pass`** (a readable refusal on
+Expected on success: **`stub: 145/145 vectors pass`** (a readable refusal on
 failure names the failing vector). The selftest referees the reference stub
 against the counted vector suite - deterministic, in-process; the model is
 the attacker, never the judge. A pass means "no counter-example found",
-never a proof. The count is 131 by counted truth, pinned by
+never a proof. The count is 145 by counted truth, pinned by
 `kit/vectors/MANIFEST.sha256`. For the full kit (fake endpoint, fuzz, LLM
 targets) see `kit/README.md`.
 
@@ -49,10 +49,10 @@ targets) see `kit/README.md`.
 | `spec/FIELD-NAMING.md` | The field-naming ruling for rail-specific names |
 | `spec/WIRE-CLAIMS-DRAFT.md` | Draft claims/receipt API surface (drafted, not built) |
 | `kit/` | The battle-test kit (Python standard library only): oracles, vectors runner, fake endpoint, bootstrap |
-| `kit/vectors/` | 8 JSON vector suites - **131 counted cases** - pinned by `kit/vectors/MANIFEST.sha256` |
+| `kit/vectors/` | 8 JSON vector suites - **145 counted cases** - pinned by `kit/vectors/MANIFEST.sha256` |
 | `kit/stub/seams_stub.py` | The reference stub target - a complete in-process wire implementation |
 | `docs/` | `PROTOCOL-DECISIONS.md` (the ratified decisions this seed carries) and the archived original packet README at `docs/archive/00-README.md` - kept verbatim, links unresolved; the packet's narrative sections do not ship here (see `PROVENANCE.txt`) |
-| `tests/` | The seed acceptance gates: manifest, 131/131 selftest, scrub (`python3 -m pytest tests/`) |
+| `tests/` | The seed acceptance gates: manifest, 145/145 selftest, scrub (`python3 -m pytest tests/`) |
 | `HELPER.md` | Pointer to the real zephyr helper branch - intentionally not vendored; parity unverified |
 | `MANIFEST.sha256` | sha256 of every shipped file; `sha256sum -c MANIFEST.sha256` must pass in a fresh checkout |
 | `PROVENANCE.txt` | Where every seeded artifact came from |
@@ -73,5 +73,5 @@ targets) see `kit/README.md`.
 The launcher and node-one ship in the sibling runtime repo (working name
 `seams-runtime`): clone it, run `node eom/launcher/launch.mjs`, and the UI
 comes up on `http://127.0.0.1:4173` with node-one on `http://127.0.0.1:8080`.
-That repo holds no spec and no vectors - the spec and this 131-case selftest
+That repo holds no spec and no vectors - the spec and this 145-case selftest
 live here. Repo names are placeholders; final naming is the owner's call.

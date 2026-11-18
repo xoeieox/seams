@@ -41,3 +41,18 @@ it.
 - Cross-rail resolution order when a contributor holds multiple rail
   bindings.
 - The canonical payment-intent view for ledger surfaces.
+
+## Display handles (ratified 2026-11-18)
+
+A display handle is a username plus a key tail: the **last five characters** of the public
+key (last-FIVE, ratified over last-four).
+
+- Display handles are **non-unique by design**. Two different keys can render the same
+  handle; the UI must not imply uniqueness.
+- The full embedded key (`key:ed25519:...`) is the only ground truth for who created or
+  vouched for what. A handle is a convenience label, never a join key.
+- A handle collision is display confusion, never identity takeover: signatures prove key
+  control and vouches prove personhood - neither depends on any display string being
+  unique.
+- Any surface that renders authorship (deposits, versions, ledger views) shows the key tail
+  beside the name, and exposes the full node key on hover/title.

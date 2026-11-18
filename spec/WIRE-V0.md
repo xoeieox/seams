@@ -123,6 +123,26 @@ or `{"status": "refused", "reason": "gm_tier" | "parent_consent", "blocked": [{"
 - For a fork or remix, every parent is checked with `check_use(parent, derivation, aspect from kind, origin, contexts)`. Anything short of `permitted` refuses the whole emit, and `blocked` says which parent and why. This is "fail closed": a derivative can't be deposited past a parent's consent.
 - The kind maps to an aspect: character, item, scene, setting and plot map to themselves, and everything else checks `whole`.
 
+### Ingest strip class (anti-squat, ratified 2026-11-18)
+
+At ingest, before any hashing, text content is run through a **strip class** of invisible
+codepoints: the existing control/format class (U+0000-U+0008, U+000B-U+001F, U+007F-U+009F,
+U+200B-U+200F - pre-existing, covering ZWSP/ZWJ/ZWNJ/LRM/RLM, U+202A-U+202E, U+2066-U+2069,
+U+FEFF) plus the red-team v3 survivor set: U+00AD (soft hyphen), U+061C (Arabic letter
+mark), U+08E2 (Arabic fathatan), U+180E (Mongolian vowel separator), U+2060 (word joiner),
+U+2061-U+2064 (invisible math operators), U+FE00 (variation selector-1), U+E0001 (language
+tag). **Why:** the survivor codepoints render with no visible difference, so text carrying
+them survived cleaning, hashed distinctly, and landed as key-verified deposits -
+near-invisible content mimicry and squat-space next to trust labels (red-team v3, F-25/O1,
+2026-11-13). Stripping joins the existing stripped-class behavior (collapse to the base
+entry, cross-key squat -> `already_deposited`); it is never a 409 in itself. The variation
+selector siblings U+FE01-U+FE0F are deliberately **kept**: they can legitimately change
+glyph/emoji presentation (U+FE0F VS16 especially), and stripping them would mutate what a
+human sees, which is a different operation. The class covers entry text and the name
+normalizer on the node reference implementation. Reference code: `kit/stub/seams_stub.py`
+(`strip_invisible`) and node-one `eom/node-one/attributed-text/lib.mjs` (`BAD_CHARS`).
+Pinned by `vectors/squat.json`.
+
 ## 3. `declare`: set or change terms
 
 ```json
