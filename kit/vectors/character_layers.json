@@ -1,0 +1,437 @@
+{
+ "wire": "seams-wire/0.2-draft",
+ "about": "Character layers, the assisted origin and declared provenance fields (Kyma request 2026-10-13). Own fixture: the shared one plus a voice-layer grant on the farmer.",
+ "fixture": {
+  "works": {
+   "sha256:fixture-farmer": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-paladin": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-pinup": {
+    "creator": "key:creator-x"
+   },
+   "sha256:fixture-v0-row": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-unpublished": {
+    "creator": "key:creator-a",
+    "published": false
+   },
+   "sha256:fixture-revoked": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-baker": {
+    "creator": "key:creator-a"
+   },
+   "sha256:fixture-adventurous-baker": {
+    "creator": "key:player-b",
+    "parents": [
+     "sha256:fixture-baker"
+    ]
+   },
+   "sha256:fixture-limited": {
+    "creator": "key:creator-x"
+   }
+  },
+  "declarations": [
+   {
+    "subject": "*",
+    "declared_by": "key:creator-a",
+    "denied_uses": [
+     "training"
+    ],
+    "contexts": {
+     "taxonomy": "lapis-rpg/0",
+     "allow": [
+      {
+       "tag": "violence/*",
+       "max_tier": 2
+      }
+     ],
+     "deny": [],
+     "hard_limits": []
+    },
+    "note": "Creator A default policy"
+   },
+   {
+    "subject": "sha256:fixture-farmer",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "fork",
+     "remix",
+     "context"
+    ],
+    "origin": {
+     "fork": "played"
+    },
+    "note": "Grow my farmer through play; no desk rewrites of their story."
+   },
+   {
+    "subject": "sha256:fixture-farmer",
+    "declared_by": "key:squatter",
+    "allowed_uses": [
+     "training"
+    ],
+    "note": "squatter, must be ignored"
+   },
+   {
+    "subject": "sha256:fixture-paladin",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "remix"
+    ]
+   },
+   {
+    "subject": "sha256:fixture-paladin",
+    "aspect": "magic",
+    "declared_by": "key:creator-a",
+    "denied_uses": [
+     "remix"
+    ],
+    "note": "Remix the paladin, not their magic system."
+   },
+   {
+    "subject": "*",
+    "declared_by": "key:creator-x",
+    "allowed_uses": [
+     "context",
+     "fork"
+    ],
+    "contexts": {
+     "taxonomy": "adult-platform/0",
+     "allow": [
+      {
+       "tag": "mature/*",
+       "max_tier": 3
+      }
+     ],
+     "deny": [
+      "mature/degradation"
+     ],
+     "hard_limits": [
+      "mature/non-consent"
+     ]
+    },
+    "note": "Creator X adult-account default policy"
+   },
+   {
+    "subject": "sha256:fixture-v0-row",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "remix"
+    ],
+    "denied_uses": [
+     "training"
+    ],
+    "scope": "standing",
+    "revokes": false,
+    "note": ""
+   },
+   {
+    "subject": "sha256:fixture-revoked",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "redistribution"
+    ]
+   },
+   {
+    "subject": "sha256:fixture-revoked",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [],
+    "denied_uses": [],
+    "revokes": true
+   },
+   {
+    "subject": "sha256:fixture-baker",
+    "declared_by": "key:creator-a",
+    "allowed_uses": [
+     "remix",
+     "context"
+    ],
+    "contexts": {
+     "taxonomy": "lapis-rpg/0",
+     "allow": [],
+     "deny": [],
+     "hard_limits": [
+      "mature/*"
+     ]
+    },
+    "note": "My baker is just a baker. Never in mature scenes."
+   },
+   {
+    "subject": "sha256:fixture-adventurous-baker",
+    "declared_by": "key:player-b",
+    "allowed_uses": [
+     "fork",
+     "remix",
+     "training",
+     "context"
+    ],
+    "contexts": {
+     "taxonomy": "lapis-rpg/0",
+     "allow": [
+      {
+       "tag": "mature/*"
+      },
+      {
+       "tag": "violence/*"
+      }
+     ],
+     "deny": [],
+     "hard_limits": []
+    },
+    "note": "Remixer tries to open everything up."
+   },
+   {
+    "subject": "sha256:fixture-limited",
+    "declared_by": "key:creator-x",
+    "contexts": {
+     "taxonomy": "adult-platform/0",
+     "allow": [
+      {
+       "tag": "mature/*",
+       "max_tier": 3,
+       "min_profile": "platform"
+      }
+     ],
+     "deny": [],
+     "hard_limits": []
+    },
+    "note": "Mature scenes only on platform-enforced surfaces."
+   },
+   {
+    "subject": "sha256:fixture-farmer",
+    "aspect": "character.voice",
+    "declared_by": "key:creator-a",
+    "denied_uses": [
+     "fork",
+     "remix"
+    ],
+    "note": "Grow her through play, but don't rewrite her voice."
+   }
+  ]
+ },
+ "cases": [
+  {
+   "name": "layer with its own grant decides",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "fork",
+    "aspect": "character.voice",
+    "origin": "played"
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "aspect"
+    }
+   }
+  },
+  {
+   "name": "layer without a grant falls back to the work",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "fork",
+    "aspect": "character.state",
+    "origin": "played"
+   },
+   "expect": {
+    "verdict": "permitted",
+    "decided_by": {
+     "level": "work"
+    }
+   }
+  },
+  {
+   "name": "character.consent is never a use-terms target",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "fork",
+    "aspect": "character.consent",
+    "origin": "played"
+   },
+   "expect": {
+    "error": "unknown_aspect"
+   }
+  },
+  {
+   "name": "assisted edit fails a played-only filter",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "fork",
+    "origin": "assisted"
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "origin_filter"
+    }
+   }
+  },
+  {
+   "name": "unknown origin is an error",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "fork",
+    "origin": "dreamed"
+   },
+   "expect": {
+    "error": "bad_origin"
+   }
+  },
+  {
+   "name": "play-fork touching only state deposits",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:player-b",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "ZGVsdGE=",
+    "parents": [
+     "sha256:fixture-farmer"
+    ],
+    "derivation": "fork",
+    "touched_aspects": [
+     "character.state",
+     "character.relationships"
+    ],
+    "provenance": {
+     "origin": "played",
+     "session_ref": "session:demo-2",
+     "engine_build": "kyma-main@0.4.0",
+     "consent_enforced": true
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "provenance": {
+     "engine_build": "kyma-main@0.4.0",
+     "consent_enforced": true
+    }
+   }
+  },
+  {
+   "name": "play-fork touching voice is refused for that layer",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:player-b",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "ZGVsdGE=",
+    "parents": [
+     "sha256:fixture-farmer"
+    ],
+    "derivation": "fork",
+    "touched_aspects": [
+     "character.state",
+     "character.voice"
+    ],
+    "provenance": {
+     "origin": "played"
+    }
+   },
+   "expect": {
+    "status": "refused",
+    "reason": "parent_consent",
+    "blocked": [
+     {
+      "parent": "sha256:fixture-farmer",
+      "aspect": "character.voice",
+      "verdict": "denied"
+     }
+    ]
+   }
+  },
+  {
+   "name": "consent_enforced false is recorded, not blocked",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:player-b",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "ZGVsdGE=",
+    "parents": [
+     "sha256:fixture-farmer"
+    ],
+    "derivation": "fork",
+    "touched_aspects": [
+     "character.state"
+    ],
+    "provenance": {
+     "origin": "played",
+     "engine_build": "fork-xyz@1.0",
+     "consent_enforced": false
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "provenance": {
+     "consent_enforced": false
+    }
+   }
+  },
+  {
+   "name": "consent_enforced must be a boolean",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:player-b",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "ZGVsdGE=",
+    "parents": [
+     "sha256:fixture-farmer"
+    ],
+    "derivation": "fork",
+    "provenance": {
+     "origin": "played",
+     "consent_enforced": "no"
+    }
+   },
+   "expect": {
+    "error": "bad_provenance"
+   }
+  },
+  {
+   "name": "a filter may list several origins",
+   "setup": [
+    {
+     "op": "declare",
+     "creator_key_ref": "key:creator-a",
+     "use_terms": {
+      "subject": "sha256:fixture-farmer",
+      "allowed_uses": [
+       "fork",
+       "remix",
+       "context"
+      ],
+      "origin": {
+       "fork": [
+        "played",
+        "assisted"
+       ]
+      }
+     }
+    }
+   ],
+   "request": {
+    "op": "check_use",
+    "work": "sha256:fixture-farmer",
+    "capability": "fork",
+    "origin": "assisted"
+   },
+   "expect": {
+    "verdict": "permitted",
+    "decided_by": {
+     "level": "work"
+    }
+   }
+  }
+ ]
+}

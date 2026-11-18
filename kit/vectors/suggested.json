@@ -1,0 +1,425 @@
+{
+ "fixture": {
+  "works": {
+   "sha256:imp-card": {
+    "creator": "key:importer",
+    "suggested": true,
+    "kind": "character"
+   },
+   "sha256:imp-fork": {
+    "creator": "key:player-b",
+    "parents": [
+     "sha256:imp-card"
+    ],
+    "kind": "character"
+   }
+  },
+  "declarations": [
+   {
+    "subject": "sha256:imp-card",
+    "declared_by": "key:importer",
+    "denied_uses": [
+     "fork"
+    ],
+    "note": "advisory: the importer's own wish, not an author's"
+   },
+   {
+    "subject": "sha256:imp-fork",
+    "declared_by": "key:player-b",
+    "allowed_uses": [
+     "fork",
+     "remix",
+     "training",
+     "context"
+    ]
+   }
+  ]
+ },
+ "cases": [
+  {
+   "name": "fork of a suggested work is open, whatever the importer wrote",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:imp-card",
+    "capability": "fork"
+   },
+   "expect": {
+    "verdict": "permitted",
+    "origin_status": "suggested",
+    "decided_by": {
+     "level": "suggested_open_default"
+    }
+   }
+  },
+  {
+   "name": "remix, view and context are open too",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:imp-card",
+    "capability": "remix"
+   },
+   "expect": {
+    "verdict": "permitted"
+   }
+  },
+  {
+   "name": "view is open",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:imp-card",
+    "capability": "view"
+   },
+   "expect": {
+    "verdict": "permitted"
+   }
+  },
+  {
+   "name": "training stays undeclared: nobody can grant it",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:imp-card",
+    "capability": "training"
+   },
+   "expect": {
+    "verdict": "undeclared",
+    "decided_by": {
+     "level": "suggested"
+    }
+   }
+  },
+  {
+   "name": "redistribution stays undeclared",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:imp-card",
+    "capability": "redistribution"
+   },
+   "expect": {
+    "verdict": "undeclared"
+   }
+  },
+  {
+   "name": "the protocol floor still binds",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:imp-card",
+    "capability": "fork",
+    "contexts": [
+     {
+      "taxonomy": "lapis-rpg/0",
+      "tag": "floor/minors"
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "denied",
+    "decided_by": {
+     "level": "context:floor"
+    }
+   }
+  },
+  {
+   "name": "an ordinary context tag is open on a suggested work",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:imp-card",
+    "capability": "fork",
+    "contexts": [
+     {
+      "taxonomy": "lapis-rpg/0",
+      "tag": "violence/combat",
+      "tier": 3
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "permitted"
+   }
+  },
+  {
+   "name": "a descendant is not blocked by a suggested ancestor",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:imp-fork",
+    "capability": "fork"
+   },
+   "expect": {
+    "verdict": "permitted"
+   }
+  },
+  {
+   "name": "a descendant cannot grant training its suggested ancestor cannot",
+   "request": {
+    "op": "check_use",
+    "work": "sha256:imp-fork",
+    "capability": "training"
+   },
+   "expect": {
+    "verdict": "undeclared",
+    "decided_by": {
+     "level": "ancestor:suggested",
+     "ancestor": "sha256:imp-card"
+    }
+   }
+  },
+  {
+   "name": "an import deposits as suggested",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:importer",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "original",
+    "provenance": {
+     "imported_from": {
+      "format": "st-card-v2",
+      "source_sha256": "abababababababababababababababababababababababababababababababab"
+     },
+     "origin_status": "suggested"
+    }
+   },
+   "expect": {
+    "status": "deposited",
+    "origin_status": "suggested"
+   }
+  },
+  {
+   "name": "an imported work is open once deposited",
+   "setup": [
+    {
+     "op": "emit",
+     "creator_key_ref": "key:importer",
+     "tier": "player",
+     "kind": "character",
+     "content_b64": "eA==",
+     "derivation": "original",
+     "provenance": {
+      "imported_from": {
+       "format": "st-card-v2",
+       "source_sha256": "abababababababababababababababababababababababababababababababab"
+      },
+      "origin_status": "suggested"
+     }
+    }
+   ],
+   "request": {
+    "op": "check_use",
+    "work": "sha256:2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881",
+    "capability": "fork"
+   },
+   "expect": {
+    "verdict": "permitted",
+    "origin_status": "suggested"
+   }
+  },
+  {
+   "name": "attributed_to is stored but never verified",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:importer",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "original",
+    "provenance": {
+     "imported_from": {
+      "format": "st-card-v2",
+      "source_sha256": "abababababababababababababababababababababababababababababababab"
+     },
+     "origin_status": "suggested",
+     "attributed_to": {
+      "name": "some card creator",
+      "verified": false
+     }
+    }
+   },
+   "expect": {
+    "status": "deposited"
+   }
+  },
+  {
+   "name": "attributed_to cannot claim to be verified",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:importer",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "original",
+    "provenance": {
+     "imported_from": {
+      "format": "st-card-v2",
+      "source_sha256": "abababababababababababababababababababababababababababababababab"
+     },
+     "origin_status": "suggested",
+     "attributed_to": {
+      "name": "some card creator",
+      "verified": true
+     }
+    }
+   },
+   "expect": {
+    "error": "bad_provenance"
+   }
+  },
+  {
+   "name": "attributed_to is only for imports",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:importer",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "original",
+    "provenance": {
+     "attributed_to": {
+      "name": "x"
+     }
+    }
+   },
+   "expect": {
+    "error": "bad_provenance"
+   }
+  },
+  {
+   "name": "imported_from without origin_status is refused",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:importer",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "original",
+    "provenance": {
+     "imported_from": {
+      "format": "st-card-v2",
+      "source_sha256": "abababababababababababababababababababababababababababababababab"
+     }
+    }
+   },
+   "expect": {
+    "error": "bad_provenance"
+   }
+  },
+  {
+   "name": "only an original can be an import",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:importer",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "fork",
+    "parents": [
+     "sha256:imp-card"
+    ],
+    "provenance": {
+     "imported_from": {
+      "format": "st-card-v2",
+      "source_sha256": "abababababababababababababababababababababababababababababababab"
+     },
+     "origin_status": "suggested",
+     "origin": "played"
+    }
+   },
+   "expect": {
+    "error": "bad_provenance"
+   }
+  },
+  {
+   "name": "a play-fork of a suggested card deposits",
+   "request": {
+    "op": "emit",
+    "creator_key_ref": "key:player-b",
+    "tier": "player",
+    "kind": "character",
+    "content_b64": "eA==",
+    "derivation": "fork",
+    "parents": [
+     "sha256:imp-card"
+    ],
+    "provenance": {
+     "origin": "played"
+    }
+   },
+   "expect": {
+    "status": "deposited"
+   }
+  },
+  {
+   "name": "the importer's declaration on a suggested work is advisory",
+   "request": {
+    "op": "declare",
+    "creator_key_ref": "key:importer",
+    "use_terms": {
+     "subject": "sha256:imp-card",
+     "denied_uses": [
+      "remix"
+     ]
+    }
+   },
+   "expect": {
+    "status": "declared",
+    "advisory": true
+   }
+  },
+  {
+   "name": "no splits on a suggested work",
+   "request": {
+    "op": "declare_terms",
+    "creator_key_ref": "key:importer",
+    "routing_terms": {
+     "subject": "sha256:imp-card",
+     "beneficiary": "key:importer",
+     "share_bps": 5000
+    }
+   },
+   "expect": {
+    "error": "suggested_work"
+   }
+  },
+  {
+   "name": "a suggested work pays no one: the payer keeps it all",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:imp-card",
+    "event_ref": "e-sug",
+    "amount": {
+     "value": 1000,
+     "asset_code": "USD",
+     "asset_scale": 2
+    }
+   },
+   "expect": {
+    "status": "quoted",
+    "manifest": {
+     "payer_retained": 1000,
+     "legs": []
+    }
+   }
+  },
+  {
+   "name": "lineage keeps the suggested root through a fork",
+   "request": {
+    "op": "get_lineage",
+    "work": "sha256:imp-card",
+    "direction": "down"
+   },
+   "expect": {
+    "nodes": [
+     {
+      "content_hash": "sha256:imp-card",
+      "origin_status": "suggested",
+      "suggested_root": true
+     },
+     {
+      "content_hash": "sha256:imp-fork",
+      "origin_status": "declared",
+      "suggested_root": true
+     }
+    ]
+   }
+  }
+ ]
+}

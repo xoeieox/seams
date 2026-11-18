@@ -1,0 +1,539 @@
+{
+ "wire": "seams-wire/0.3-draft",
+ "about": "Paper-money payments. Allocation mirrors the shipped compiler (declared-split+single-passthrough-v0), including its two normative worked examples. Execution is simulated. Semantics checked against zephyr/routing.py at 537d90f: the parent's standing term splits the direct leg paid to the parent's contributor.",
+ "fixture": {
+  "works": {
+   "sha256:fx-derived": {
+    "creator": "key:S",
+    "parents": [
+     "sha256:fx-parent"
+    ]
+   },
+   "sha256:fx-parent": {
+    "creator": "key:D"
+   },
+   "sha256:fx-tie": {
+    "creator": "key:A"
+   },
+   "sha256:fx-g1": {
+    "creator": "key:G"
+   },
+   "sha256:fx-g2": {
+    "creator": "key:H",
+    "parents": [
+     "sha256:fx-g1"
+    ]
+   },
+   "sha256:fx-g3": {
+    "creator": "key:I",
+    "parents": [
+     "sha256:fx-g2"
+    ]
+   },
+   "sha256:fx-bare": {
+    "creator": "key:B"
+   }
+  },
+  "routing_terms": [
+   {
+    "subject": "sha256:fx-derived",
+    "beneficiary": "key:D",
+    "share_bps": 4000,
+    "scope": "standing"
+   },
+   {
+    "subject": "sha256:fx-derived",
+    "beneficiary": "key:M",
+    "share_bps": 2500,
+    "scope": "standing"
+   },
+   {
+    "subject": "sha256:fx-parent",
+    "beneficiary": "key:P",
+    "share_bps": 1000,
+    "scope": "standing"
+   },
+   {
+    "subject": "sha256:fx-tie",
+    "beneficiary": "key:A",
+    "share_bps": 2500
+   },
+   {
+    "subject": "sha256:fx-tie",
+    "beneficiary": "key:B",
+    "share_bps": 2500
+   },
+   {
+    "subject": "sha256:fx-tie",
+    "beneficiary": "key:C",
+    "share_bps": 2500
+   },
+   {
+    "subject": "sha256:fx-g1",
+    "beneficiary": "key:G",
+    "share_bps": 1000
+   },
+   {
+    "subject": "sha256:fx-g2",
+    "beneficiary": "key:H",
+    "share_bps": 1000
+   },
+   {
+    "subject": "sha256:fx-g3",
+    "beneficiary": "key:I",
+    "share_bps": 5000
+   }
+  ],
+  "wallets": {
+   "key:D": "https://wallet.example/d",
+   "key:M": "https://wallet.example/m",
+   "key:A": "https://wallet.example/a",
+   "key:B": "https://wallet.example/b",
+   "key:C": "https://wallet.example/c"
+  }
+ },
+ "cases": [
+  {
+   "name": "spec worked example: 500 with D 40%, M 25%, P 10% pass-through",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": 500,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "manifest": {
+     "payer_retained": 175,
+     "legs": [
+      {
+       "beneficiary": "key:D",
+       "amount": 180
+      },
+      {
+       "beneficiary": "key:P",
+       "amount": 20
+      },
+      {
+       "beneficiary": "key:M",
+       "amount": 125
+      }
+     ],
+     "depth": 1
+    }
+   }
+  },
+  {
+   "name": "spec tie example: 3 units across three 25% shares",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-tie",
+    "amount": {
+     "value": 3,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "manifest": {
+     "payer_retained": 0,
+     "legs": [
+      {
+       "beneficiary": "key:A",
+       "amount": 1
+      },
+      {
+       "beneficiary": "key:B",
+       "amount": 1
+      },
+      {
+       "beneficiary": "key:C",
+       "amount": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "conservation on an awkward amount",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": 997,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "manifest": {
+     "payer_retained": 349,
+     "legs": [
+      {
+       "beneficiary": "key:D",
+       "amount": 359
+      },
+      {
+       "beneficiary": "key:P",
+       "amount": 40
+      },
+      {
+       "beneficiary": "key:M",
+       "amount": 249
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "no wallet: credited but unpaid, never dropped",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": 500,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "manifest": {
+     "legs": [
+      {
+       "beneficiary": "key:D",
+       "amount": 180,
+       "leg_status": "routable"
+      },
+      {
+       "beneficiary": "key:P",
+       "amount": 20,
+       "leg_status": "credited-unpaid"
+      },
+      {
+       "beneficiary": "key:M",
+       "amount": 125,
+       "leg_status": "routable"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "no terms: the payer keeps everything",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-bare",
+    "amount": {
+     "value": 500,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "manifest": {
+     "payer_retained": 500,
+     "legs": []
+    }
+   }
+  },
+  {
+   "name": "zero amount",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": 0,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "manifest": {
+     "payer_retained": 0,
+     "legs": [
+      {
+       "beneficiary": "key:D",
+       "amount": 0
+      },
+      {
+       "beneficiary": "key:P",
+       "amount": 0
+      },
+      {
+       "beneficiary": "key:M",
+       "amount": 0
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "negative amount is an error",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": -1,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "error": "bad_amount"
+   }
+  },
+  {
+   "name": "lineage deeper than 2 hops with terms needs U5",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-g3",
+    "amount": {
+     "value": 100,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "error": "depth_exceeded"
+   }
+  },
+  {
+   "name": "recording simulates routable legs and holds unpaid ones",
+   "request": {
+    "op": "record_value_event",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": 500,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "status": "recorded",
+    "executor": "simulated",
+    "receipts": [
+     {
+      "beneficiary": "key:D",
+      "state": "simulated"
+     },
+     {
+      "beneficiary": "key:P",
+      "state": "pending-credited"
+     },
+     {
+      "beneficiary": "key:M",
+      "state": "simulated"
+     }
+    ]
+   }
+  },
+  {
+   "name": "shares above 100% are refused",
+   "setup": [
+    {
+     "op": "declare_terms",
+     "creator_key_ref": "key:B",
+     "routing_terms": {
+      "subject": "sha256:fx-bare",
+      "beneficiary": "key:B",
+      "share_bps": 6000
+     }
+    },
+    {
+     "op": "declare_terms",
+     "creator_key_ref": "key:B",
+     "routing_terms": {
+      "subject": "sha256:fx-bare",
+      "beneficiary": "key:C",
+      "share_bps": 5000
+     }
+    }
+   ],
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-bare",
+    "amount": {
+     "value": 100,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "error": "bad_terms"
+   }
+  },
+  {
+   "name": "one event allocates once: a different amount is a replay conflict",
+   "setup": [
+    {
+     "op": "record_value_event",
+     "work": "sha256:fx-derived",
+     "amount": {
+      "value": 500,
+      "asset_code": "USD",
+      "asset_scale": 2
+     },
+     "event_ref": "e1"
+    }
+   ],
+   "request": {
+    "op": "record_value_event",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": 600,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "error": "replay_conflict"
+   }
+  },
+  {
+   "name": "re-recording the same event is idempotent",
+   "setup": [
+    {
+     "op": "record_value_event",
+     "work": "sha256:fx-derived",
+     "amount": {
+      "value": 500,
+      "asset_code": "USD",
+      "asset_scale": 2
+     },
+     "event_ref": "e1"
+    }
+   ],
+   "request": {
+    "op": "record_value_event",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": 500,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "status": "recorded"
+   }
+  },
+  {
+   "name": "only the creator key can declare a split on a work",
+   "request": {
+    "op": "declare_terms",
+    "creator_key_ref": "key:A",
+    "routing_terms": {
+     "subject": "sha256:fx-bare",
+     "beneficiary": "key:A",
+     "share_bps": 9000
+    }
+   },
+   "expect": {
+    "error": "not_creator"
+   }
+  },
+  {
+   "name": "amount with boolean value is an error",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": true,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "error": "bad_amount"
+   }
+  },
+  {
+   "name": "amount with missing asset_code is an error",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": 100,
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "error": "bad_amount"
+   }
+  },
+  {
+   "name": "amount with missing asset_scale is an error",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": 100,
+     "asset_code": "USD"
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "error": "bad_amount"
+   }
+  },
+  {
+   "name": "amount with non-string asset_code is an error",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": 100,
+     "asset_code": 5,
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "error": "bad_amount"
+   }
+  },
+  {
+   "name": "amount with boolean asset_scale is an error",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": 100,
+     "asset_code": "USD",
+     "asset_scale": true
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "error": "bad_amount"
+   }
+  },
+  {
+   "name": "amount that is not an object is an error",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-derived",
+    "amount": 5,
+    "event_ref": "e1"
+   },
+   "expect": {
+    "error": "bad_amount"
+   }
+  }
+ ]
+}

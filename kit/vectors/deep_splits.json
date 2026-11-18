@@ -1,0 +1,396 @@
+{
+ "wire": "seams-wire/0.3-draft",
+ "about": "DRAFT deeper splits (U5), opt-in with algorithm=recursive-passthrough-draft. Generalizes the shipped rule (a work's standing term splits the leg paid to that work's contributor) to every level and to several parents. Not the ratified DoD algorithm, which Seams hasn't seen.",
+ "fixture": {
+  "works": {
+   "sha256:deep-farmer-a": {
+    "creator": "key:A"
+   },
+   "sha256:deep-farmer-b": {
+    "creator": "key:B",
+    "parents": [
+     "sha256:deep-farmer-a"
+    ]
+   },
+   "sha256:deep-farmer-c": {
+    "creator": "key:C",
+    "parents": [
+     "sha256:deep-farmer-b"
+    ]
+   },
+   "sha256:dia-z": {
+    "creator": "key:Z"
+   },
+   "sha256:dia-x": {
+    "creator": "key:X",
+    "parents": [
+     "sha256:dia-z"
+    ]
+   },
+   "sha256:dia-y": {
+    "creator": "key:Y",
+    "parents": [
+     "sha256:dia-z"
+    ]
+   },
+   "sha256:dia-d": {
+    "creator": "key:D",
+    "parents": [
+     "sha256:dia-x",
+     "sha256:dia-y"
+    ]
+   },
+   "sha256:over-x": {
+    "creator": "key:K"
+   },
+   "sha256:over-y": {
+    "creator": "key:K"
+   },
+   "sha256:over-d": {
+    "creator": "key:OD",
+    "parents": [
+     "sha256:over-x",
+     "sha256:over-y"
+    ]
+   },
+   "sha256:fx-derived": {
+    "creator": "key:S",
+    "parents": [
+     "sha256:fx-parent"
+    ]
+   },
+   "sha256:fx-parent": {
+    "creator": "key:D"
+   },
+   "sha256:fx-tie": {
+    "creator": "key:A"
+   },
+   "sha256:fx-g1": {
+    "creator": "key:G"
+   },
+   "sha256:fx-g2": {
+    "creator": "key:H",
+    "parents": [
+     "sha256:fx-g1"
+    ]
+   },
+   "sha256:fx-g3": {
+    "creator": "key:I",
+    "parents": [
+     "sha256:fx-g2"
+    ]
+   },
+   "sha256:fx-bare": {
+    "creator": "key:B"
+   }
+  },
+  "routing_terms": [
+   {
+    "subject": "sha256:deep-farmer-c",
+    "beneficiary": "key:C",
+    "share_bps": 3000
+   },
+   {
+    "subject": "sha256:deep-farmer-c",
+    "beneficiary": "key:B",
+    "share_bps": 2000
+   },
+   {
+    "subject": "sha256:deep-farmer-b",
+    "beneficiary": "key:A",
+    "share_bps": 1000
+   },
+   {
+    "subject": "sha256:deep-farmer-a",
+    "beneficiary": "key:Q",
+    "share_bps": 5000
+   },
+   {
+    "subject": "sha256:dia-d",
+    "beneficiary": "key:D",
+    "share_bps": 5000
+   },
+   {
+    "subject": "sha256:dia-d",
+    "beneficiary": "key:X",
+    "share_bps": 2000
+   },
+   {
+    "subject": "sha256:dia-d",
+    "beneficiary": "key:Y",
+    "share_bps": 1000
+   },
+   {
+    "subject": "sha256:dia-x",
+    "beneficiary": "key:Z",
+    "share_bps": 1000
+   },
+   {
+    "subject": "sha256:dia-y",
+    "beneficiary": "key:Z",
+    "share_bps": 1000
+   },
+   {
+    "subject": "sha256:over-d",
+    "beneficiary": "key:K",
+    "share_bps": 5000
+   },
+   {
+    "subject": "sha256:over-x",
+    "beneficiary": "key:U",
+    "share_bps": 6000
+   },
+   {
+    "subject": "sha256:over-y",
+    "beneficiary": "key:V",
+    "share_bps": 5000
+   },
+   {
+    "subject": "sha256:fx-derived",
+    "beneficiary": "key:D",
+    "share_bps": 4000,
+    "scope": "standing"
+   },
+   {
+    "subject": "sha256:fx-derived",
+    "beneficiary": "key:M",
+    "share_bps": 2500,
+    "scope": "standing"
+   },
+   {
+    "subject": "sha256:fx-parent",
+    "beneficiary": "key:P",
+    "share_bps": 1000,
+    "scope": "standing"
+   },
+   {
+    "subject": "sha256:fx-tie",
+    "beneficiary": "key:A",
+    "share_bps": 2500
+   },
+   {
+    "subject": "sha256:fx-tie",
+    "beneficiary": "key:B",
+    "share_bps": 2500
+   },
+   {
+    "subject": "sha256:fx-tie",
+    "beneficiary": "key:C",
+    "share_bps": 2500
+   },
+   {
+    "subject": "sha256:fx-g1",
+    "beneficiary": "key:G",
+    "share_bps": 1000
+   },
+   {
+    "subject": "sha256:fx-g2",
+    "beneficiary": "key:H",
+    "share_bps": 1000
+   },
+   {
+    "subject": "sha256:fx-g3",
+    "beneficiary": "key:I",
+    "share_bps": 5000
+   }
+  ],
+  "wallets": {
+   "key:B": "https://wallet.example/b",
+   "key:C": "https://wallet.example/c",
+   "key:D": "https://wallet.example/d",
+   "key:X": "https://w/x",
+   "key:Y": "https://w/y",
+   "key:Z": "https://w/z",
+   "key:Q": "https://w/q",
+   "key:M": "https://wallet.example/m"
+  }
+ },
+ "cases": [
+  {
+   "name": "shipped v0 refuses: the grandparent carries a standing term",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:deep-farmer-c",
+    "amount": {
+     "value": 1000,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1"
+   },
+   "expect": {
+    "error": "depth_exceeded"
+   }
+  },
+  {
+   "name": "a chain of forks: each work's standing term passes a share of its creator's leg upward",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:deep-farmer-c",
+    "amount": {
+     "value": 1000,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1",
+    "algorithm": "recursive-passthrough-draft"
+   },
+   "expect": {
+    "manifest": {
+     "payer_retained": 500,
+     "depth": 2,
+     "legs": [
+      {
+       "beneficiary": "key:B",
+       "amount": 180
+      },
+      {
+       "beneficiary": "key:A",
+       "amount": 10
+      },
+      {
+       "beneficiary": "key:Q",
+       "amount": 10
+      },
+      {
+       "beneficiary": "key:C",
+       "amount": 300
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "an upstream creator with no wallet is credited, never dropped",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:deep-farmer-c",
+    "amount": {
+     "value": 1000,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1",
+    "algorithm": "recursive-passthrough-draft"
+   },
+   "expect": {
+    "manifest": {
+     "legs": [
+      {
+       "beneficiary": "key:B",
+       "amount": 180,
+       "leg_status": "routable"
+      },
+      {
+       "beneficiary": "key:A",
+       "amount": 10,
+       "leg_status": "credited-unpaid"
+      },
+      {
+       "beneficiary": "key:Q",
+       "amount": 10,
+       "leg_status": "routable"
+      },
+      {
+       "beneficiary": "key:C",
+       "amount": 300,
+       "leg_status": "routable"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "a remix of two works: both parents pass up, and a shared ancestor is paid once per path",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:dia-d",
+    "amount": {
+     "value": 1000,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1",
+    "algorithm": "recursive-passthrough-draft"
+   },
+   "expect": {
+    "manifest": {
+     "payer_retained": 200,
+     "legs": [
+      {
+       "beneficiary": "key:D",
+       "amount": 500
+      },
+      {
+       "beneficiary": "key:X",
+       "amount": 180
+      },
+      {
+       "beneficiary": "key:Z",
+       "amount": 20
+      },
+      {
+       "beneficiary": "key:Y",
+       "amount": 90
+      },
+      {
+       "beneficiary": "key:Z",
+       "amount": 10
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "pass-through shares above 100% on one leg are refused",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:over-d",
+    "amount": {
+     "value": 1000,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1",
+    "algorithm": "recursive-passthrough-draft"
+   },
+   "expect": {
+    "error": "bad_terms"
+   }
+  },
+  {
+   "name": "the compiler spec's worked example is unchanged under the draft",
+   "request": {
+    "op": "quote_route",
+    "work": "sha256:fx-derived",
+    "amount": {
+     "value": 500,
+     "asset_code": "USD",
+     "asset_scale": 2
+    },
+    "event_ref": "e1",
+    "algorithm": "recursive-passthrough-draft"
+   },
+   "expect": {
+    "manifest": {
+     "payer_retained": 175,
+     "depth": 1,
+     "legs": [
+      {
+       "beneficiary": "key:D",
+       "amount": 180
+      },
+      {
+       "beneficiary": "key:P",
+       "amount": 20
+      },
+      {
+       "beneficiary": "key:M",
+       "amount": 125
+      }
+     ]
+    }
+   }
+  }
+ ]
+}
